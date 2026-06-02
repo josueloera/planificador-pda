@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { generarSopaDeLetras } from '../utils/juegosLogic';
 
 // =====================================================================
 // ⚠️ ATENCIÓN: LA LLAVE SE LEE DESDE EL ARCHIVO OCULTO .env O CLIPPY
@@ -61,7 +62,11 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
       // Intentar parsear el JSON
       const jsonStr = content.substring(content.indexOf('{'), content.lastIndexOf('}') + 1);
       const parsed = JSON.parse(jsonStr);
-      setResultado({ tipo: tipoMaterial, data: parsed });
+      let sopaData = null;
+      if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO' && parsed.palabras) {
+        sopaData = generarSopaDeLetras(parsed.palabras, 15);
+      }
+      setResultado({ tipo: tipoMaterial, data: parsed, sopaData });
 
     } catch (error) {
       console.error(error);
@@ -199,30 +204,39 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
             </div>
           )}
 
-          {/* Renderizado de Vocabulario */}
-          {resultado.tipo === 'SOPA_LETRAS_VOCABULARIO' && (
+          {/* Renderizado de Vocabulario (Sopa de Letras) */}
+          {resultado.tipo === 'SOPA_LETRAS_VOCABULARIO' && resultado.sopaData && (
             <div>
               <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                <h1 style={{ fontSize: '1.5rem', textTransform: 'uppercase' }}>{resultado.data.titulo}</h1>
-                <p>Lista de palabras y pistas para armar tus juegos didácticos.</p>
+                <h1 style={{ fontSize: '1.5rem', textTransform: 'uppercase' }}>Sopa de Letras: {resultado.data.titulo}</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', borderBottom: '1px solid #000', paddingBottom: '5px' }}>
+                  <span>Nombre del alumno: _________________________________________</span>
+                  <span>Fecha: ______________</span>
+                </div>
               </div>
               
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f2f2f2' }}>
-                    <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Palabra</th>
-                    <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Pista / Definición</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resultado.data.palabras.map((p, i) => (
-                    <tr key={i}>
-                      <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold', letterSpacing: '2px' }}>{p.palabra}</td>
-                      <td style={{ border: '1px solid #ddd', padding: '12px' }}>{p.pista}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {/* Cuadrícula Sopa de Letras */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${resultado.sopaData.grid.length}, 30px)`, gap: '2px', padding: '15px', border: '2px solid #333', background: '#f8f9fa' }}>
+                  {resultado.sopaData.grid.map((row, r) => 
+                    row.map((letter, c) => (
+                      <div key={`${r}-${c}`} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.1rem', background: 'white', border: '1px solid #eee' }}>
+                        {letter}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <h3>Encuentra las siguientes palabras respondiendo a las pistas:</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
+                {resultado.sopaData.palabrasColocadas.map((p, i) => (
+                  <div key={i} style={{ padding: '10px', border: '1px dashed #ccc', borderRadius: '5px' }}>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#333' }}>{i + 1}. {p.pista}</p>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '0.7rem', color: '#999' }}>( _ _ _ _ )</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
