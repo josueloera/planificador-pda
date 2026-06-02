@@ -3,6 +3,7 @@ import './App.css';
 
 // --- IMPORTACIONES (Si alguna falla, el código tiene protección) ---
 import { obtenerPlanSemanal } from './planner_logic'; 
+import GeneradorMaterial from './components/GeneradorMaterial';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
@@ -406,6 +407,7 @@ function App() {
       { id: 'COMISIONES', icon: '🔔', label: 'Comisiones', desc: `${comisiones.length} pendientes`, color: '#FD79A8', action: ()=>setVista('COMISIONES') },
       { id: 'PROYECTOS', icon: '🚀', label: 'Proyectos', desc: 'Didácticos NEM', color: '#00CEC9', action: ()=>{setVista('PROYECTOS'); ipcRenderer.invoke('get-proyectos', grado).then(setListaProyectos);} },
       { id: 'BITACORA', icon: '📂', label: 'Bitácora', desc: 'Fichas e incidencias', color: '#636E72', action: ()=>{setVista('BITACORA'); setAlumnoBitacora(null);} },
+      { id: 'MATERIALES', icon: '🧩', label: 'Materiales', desc: 'Exámenes y juegos', color: '#FF9F43', action: ()=>setVista('MATERIALES') },
     ];
     return (
     <div className="pantalla-menu">
@@ -432,6 +434,10 @@ function App() {
         </div>
     </div>
   );}
+
+  if(vista === 'MATERIALES') {
+      return <GeneradorMaterial onVolver={() => setVista('MENU')} pdasDisponibles={pdasDisponibles} grado={grado} />;
+  }
 
   if(vista === 'EVAL') { 
       const sumaPorcentajes = (criterios || []).reduce((acc, c) => acc + (parseFloat(c.porcentaje) || 0), 0); 
