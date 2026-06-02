@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { generarSopaDeLetras } from '../utils/juegosLogic';
+import clg from 'crossword-layout-generator';
 
 // =====================================================================
 // ⚠️ ATENCIÓN: LA LLAVE SE LEE DESDE EL ARCHIVO OCULTO .env O CLIPPY
@@ -9,6 +10,7 @@ const MI_OPENAI_API_KEY = "sk-proj-RC4ZD7Qg1_Vrr6D8GecqceU7QRroHPZus6dGBPXgrkX3H
 const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
   const [tema, setTema] = useState('');
   const [tipoMaterial, setTipoMaterial] = useState('EXAMEN_OPCION_MULTIPLE');
+  const [cantidadReactivos, setCantidadReactivos] = useState(5);
   const [generando, setGenerando] = useState(false);
   const [resultado, setResultado] = useState(null);
 
@@ -28,14 +30,20 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
     let userPrompt = "";
 
     if (tipoMaterial === 'EXAMEN_OPCION_MULTIPLE') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }";
-      userPrompt = `Genera un examen de opción múltiple de 5 preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"una sola palabra clave en ingles para buscar imagen (ej. photosynthesis)\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }";
+      userPrompt = `Genera un examen de opción múltiple de ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+    } else if (tipoMaterial === 'EXAMEN_TRIMESTRAL') {
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"una sola palabra clave en ingles para buscar imagen (ej. history)\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }";
+      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple de ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado.`;
     } else if (tipoMaterial === 'PREGUNTAS_ABIERTAS') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ \"pregunta 1\", \"pregunta 2\" ] }";
-      userPrompt = `Genera un cuestionario de 5 preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"...\" } ] }";
+      userPrompt = `Genera un cuestionario de ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
     } else if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }";
-      userPrompt = `Genera una lista de 10 palabras clave y sus definiciones o pistas para armar una sopa de letras o crucigrama sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. La palabra debe estar en mayúsculas y sin espacios.`;
+      userPrompt = `Genera una lista de 15 palabras clave y sus definiciones para armar una sopa de letras sobre el tema: "${tema}". La palabra en mayúsculas y sin espacios.`;
+    } else if (tipoMaterial === 'CRUCIGRAMA') {
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }";
+      userPrompt = `Genera una lista de 10-15 palabras clave y sus definiciones cortas (como pistas de crucigrama) sobre el tema: "${tema}". Adecuado para ${grado}º grado. La palabra debe estar en mayúsculas y sin espacios.`;
     }
 
     try {
@@ -63,10 +71,15 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
       const jsonStr = content.substring(content.indexOf('{'), content.lastIndexOf('}') + 1);
       const parsed = JSON.parse(jsonStr);
       let sopaData = null;
+      let cruciData = null;
       if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO' && parsed.palabras) {
         sopaData = generarSopaDeLetras(parsed.palabras, 15);
       }
-      setResultado({ tipo: tipoMaterial, data: parsed, sopaData });
+      if (tipoMaterial === 'CRUCIGRAMA' && parsed.palabras) {
+        const clgInput = parsed.palabras.map(p => ({ answer: p.palabra.toUpperCase().replace(/[^A-Z]/g,''), clue: p.pista }));
+        cruciData = clg.generateLayout(clgInput);
+      }
+      setResultado({ tipo: tipoMaterial, data: parsed, sopaData, cruciData });
 
     } catch (error) {
       console.error(error);
@@ -107,13 +120,28 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
             onChange={(e) => setTipoMaterial(e.target.value)}
             style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginBottom: '20px', fontSize: '1rem' }}
           >
-            <option value="EXAMEN_OPCION_MULTIPLE">📝 Examen de Opción Múltiple</option>
+            <option value="EXAMEN_OPCION_MULTIPLE">📝 Examen Rápido (Opción Múltiple)</option>
+            <option value="EXAMEN_TRIMESTRAL">🏆 Examen Trimestral Integrador</option>
             <option value="PREGUNTAS_ABIERTAS">❓ Cuestionario (Preguntas Abiertas)</option>
-            <option value="SOPA_LETRAS_VOCABULARIO">🔠 Vocabulario (Sopa de Letras / Crucigrama)</option>
+            <option value="SOPA_LETRAS_VOCABULARIO">🔠 Sopa de Letras</option>
+            <option value="CRUCIGRAMA">➕ Crucigrama Clásico</option>
           </select>
 
+          {(tipoMaterial.includes('EXAMEN') || tipoMaterial.includes('PREGUNTAS')) && (
+            <>
+              <h3>3. Cantidad de Reactivos</h3>
+              <input 
+                type="number" 
+                min="5" max="30" 
+                value={cantidadReactivos} 
+                onChange={(e) => setCantidadReactivos(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginBottom: '20px', fontSize: '1rem' }}
+              />
+            </>
+          )}
+
           <button 
-            onClick={generarConIA} 
+            onClick={generarConIA}  
             disabled={generando}
             style={{ 
               width: '100%', padding: '15px', background: generando ? '#95a5a6' : '#6C5CE7', 
@@ -155,8 +183,8 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
           
           <hr style={{ margin: '20px 0' }} className="no-print" />
 
-          {/* Renderizado de Examen Opción Múltiple */}
-          {resultado.tipo === 'EXAMEN_OPCION_MULTIPLE' && (
+          {/* Renderizado de Examen Opción Múltiple o Trimestral */}
+          {(resultado.tipo === 'EXAMEN_OPCION_MULTIPLE' || resultado.tipo === 'EXAMEN_TRIMESTRAL') && (
             <div>
               <div style={{ textAlign: 'center', marginBottom: '30px' }}>
                 <h1 style={{ fontSize: '1.5rem', textTransform: 'uppercase' }}>{resultado.data.titulo}</h1>
@@ -167,16 +195,23 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
               </div>
               
               {resultado.data.preguntas.map((q, i) => (
-                <div key={i} style={{ marginBottom: '25px' }}>
-                  <p style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '10px' }}>{i + 1}. {q.pregunta}</p>
-                  <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {q.opciones.map((op, j) => (
-                      <label key={j} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '15px', height: '15px', border: '1px solid #000', borderRadius: '50%' }}></div>
-                        {op}
-                      </label>
-                    ))}
+                <div key={i} style={{ marginBottom: '35px', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                  <div style={{ flex: '1' }}>
+                    <p style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '10px' }}>{i + 1}. {q.pregunta}</p>
+                    <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {q.opciones.map((op, j) => (
+                        <label key={j} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '15px', height: '15px', border: '1px solid #000', borderRadius: '50%' }}></div>
+                          {op}
+                        </label>
+                      ))}
+                    </div>
                   </div>
+                  {q.keyword_imagen_ingles && (
+                    <div style={{ width: '150px', border: '1px solid #eee', padding: '5px', borderRadius: '8px' }}>
+                      <img src={`https://image.pollinations.ai/prompt/${encodeURIComponent(q.keyword_imagen_ingles)}?width=300&height=300&nologo=true`} alt="Ilustración de la pregunta" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -194,11 +229,18 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
               </div>
               
               {resultado.data.preguntas.map((q, i) => (
-                <div key={i} style={{ marginBottom: '40px' }}>
-                  <p style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '15px' }}>{i + 1}. {q}</p>
-                  <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
-                  <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
-                  <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
+                <div key={i} style={{ marginBottom: '50px', display: 'flex', gap: '20px' }}>
+                  <div style={{ flex: '1' }}>
+                    <p style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '15px' }}>{i + 1}. {q.pregunta}</p>
+                    <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
+                    <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
+                    <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
+                  </div>
+                  {q.keyword_imagen_ingles && (
+                    <div style={{ width: '120px', border: '1px solid #eee', padding: '5px', borderRadius: '8px' }}>
+                      <img src={`https://image.pollinations.ai/prompt/${encodeURIComponent(q.keyword_imagen_ingles)}?width=240&height=240&nologo=true`} alt="Ilustración" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -239,7 +281,58 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
               </div>
             </div>
           )}
+
+          {/* Renderizado de Crucigrama */}
+          {resultado.tipo === 'CRUCIGRAMA' && resultado.cruciData && (
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                <h1 style={{ fontSize: '1.5rem', textTransform: 'uppercase' }}>Crucigrama: {resultado.data.titulo}</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', borderBottom: '1px solid #000', paddingBottom: '5px' }}>
+                  <span>Nombre del alumno: _________________________________________</span>
+                  <span>Fecha: ______________</span>
+                </div>
+              </div>
+              
+              {/* Cuadrícula Crucigrama */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${resultado.cruciData.cols}, 30px)`, gap: '0px', padding: '15px', background: 'white' }}>
+                  {resultado.cruciData.table.map((row, r) => 
+                    row.map((letter, c) => {
+                      const isBlank = letter === '-';
+                      // Buscar si esta celda es el inicio de una palabra
+                      const wordAtPos = resultado.cruciData.result.find(res => (res.starty - 1 === r && res.startx - 1 === c));
+                      return (
+                        <div key={`${r}-${c}`} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', background: isBlank ? 'black' : 'white', border: isBlank ? 'none' : '1px solid black' }}>
+                          {!isBlank && wordAtPos && (
+                            <span style={{ position: 'absolute', top: '1px', left: '2px', fontSize: '0.55rem', fontWeight: 'bold' }}>{wordAtPos.position}</span>
+                          )}
+                          {/* {!isBlank && <span style={{opacity:0.1}}>{letter}</span>} */}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              <h3>Pistas:</h3>
+              <div style={{ display: 'flex', gap: '40px', marginTop: '20px' }}>
+                <div style={{ flex: 1 }}>
+                  <h4>Horizontales</h4>
+                  {resultado.cruciData.result.filter(r => r.orientation === 'across').map((p, i) => (
+                    <p key={i} style={{ margin: '5px 0', fontSize: '0.9rem' }}><strong>{p.position}.</strong> {p.clue}</p>
+                  ))}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h4>Verticales</h4>
+                  {resultado.cruciData.result.filter(r => r.orientation === 'down').map((p, i) => (
+                    <p key={i} style={{ margin: '5px 0', fontSize: '0.9rem' }}><strong>{p.position}.</strong> {p.clue}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
       )}
     </div>
   );
