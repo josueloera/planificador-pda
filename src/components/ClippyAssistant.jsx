@@ -246,7 +246,7 @@ Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la 
         title="Arrastrame o dale clic para preguntar"
       >
         <img 
-          src="/teacher_avatar.png" 
+          src="./teacher_avatar.png" 
           alt="Profe IA" 
           style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%', pointerEvents: 'none' }} 
         />
