@@ -80,13 +80,14 @@ const ClippyAssistant = () => {
     try {
       const contextStr = window.plannerContext ? JSON.stringify({
         vista_actual: window.plannerContext.vista,
-        pdas_activos_semana: window.plannerContext.pdasSemana,
-        proyecto_actual_problematica: window.plannerContext.proyectoActual?.problemática
+        pdas_activos: window.plannerContext.vista === 'PROYECTOS' ? window.plannerContext.proyectoActual?.pdas_seleccionados : window.plannerContext.pdasSemana,
+        proyecto_actual_nombre: window.plannerContext.proyectoActual?.nombre,
+        proyecto_actual_metodologia: window.plannerContext.proyectoActual?.metodologia
       }) : 'No hay contexto disponible.';
 
       const systemPrompt = `Eres un experto en la Nueva Escuela Mexicana (NEM) y asistes a maestros de educación básica. 
 El usuario está trabajando en su software de planeación. Contexto actual de su pantalla: ${contextStr}.
-Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la función "fill_planner_form" para insertar los datos directamente en su pantalla. Crea actividades dinámicas, humanistas y basadas en proyectos.`;
+Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la función "fill_planner_form" o "fill_project_form" según la vista_actual en la que esté ("PLANNER" o "PROYECTOS"). Crea actividades dinámicas, humanistas y basadas en proyectos. En proyectos, detalla las fases.`;
 
       const apiMessages = [
         { role: 'system', content: systemPrompt },
@@ -99,19 +100,34 @@ Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la 
           type: "function",
           function: {
             name: "fill_planner_form",
-            description: "Llena automáticamente el formulario de planeación semanal.",
+            description: "Llena el formulario de planeación semanal (usar solo si vista_actual es PLANNER).",
             parameters: {
               type: "object",
               properties: {
-                lunes_inicio: { type: "string", description: "Inicio Lunes" },
-                lunes_desarrollo: { type: "string", description: "Desarrollo Lunes" },
-                lunes_cierre: { type: "string", description: "Cierre Lunes" },
+                lunes_inicio: { type: "string" }, lunes_desarrollo: { type: "string" }, lunes_cierre: { type: "string" },
                 martes_inicio: { type: "string" }, martes_desarrollo: { type: "string" }, martes_cierre: { type: "string" },
                 miercoles_inicio: { type: "string" }, miercoles_desarrollo: { type: "string" }, miercoles_cierre: { type: "string" },
                 jueves_inicio: { type: "string" }, jueves_desarrollo: { type: "string" }, jueves_cierre: { type: "string" },
                 viernes_inicio: { type: "string" }, viernes_desarrollo: { type: "string" }, viernes_cierre: { type: "string" },
-                recursos: { type: "string", description: "Materiales necesarios" },
-                evaluacion: { type: "string", description: "Formativa, Rúbricas, etc." }
+                recursos: { type: "string" }, evaluacion: { type: "string" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "fill_project_form",
+            description: "Llena el formulario del proyecto didáctico (usar solo si vista_actual es PROYECTOS).",
+            parameters: {
+              type: "object",
+              properties: {
+                fase_0: { type: "string", description: "Contenido de la Fase 1 o inicio del proyecto." },
+                fase_1: { type: "string", description: "Contenido de la Fase 2." },
+                fase_2: { type: "string", description: "Contenido de la Fase 3." },
+                fase_3: { type: "string", description: "Contenido de la Fase 4." },
+                fase_4: { type: "string", description: "Contenido de la Fase 5." },
+                fase_5: { type: "string", description: "Contenido de la Fase 6 (si aplica)." }
               }
             }
           }
@@ -139,15 +155,36 @@ Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la 
 
       // Handle function calling
       if (responseMessage.tool_calls) {
+        let acted = false;
         for (const toolCall of responseMessage.tool_calls) {
           if (toolCall.function.name === 'fill_planner_form') {
             const args = JSON.parse(toolCall.function.arguments);
             if (window.plannerContext && window.plannerContext.setPlanData) {
               window.plannerContext.setPlanData(prev => ({ ...prev, ...args }));
+              acted = true;
+            }
+          } else if (toolCall.function.name === 'fill_project_form') {
+            const args = JSON.parse(toolCall.function.arguments);
+            if (window.plannerContext && window.plannerContext.setProyectoActual) {
+              const nuevasFases = {};
+              if (args.fase_0) nuevasFases["0"] = args.fase_0;
+              if (args.fase_1) nuevasFases["1"] = args.fase_1;
+              if (args.fase_2) nuevasFases["2"] = args.fase_2;
+              if (args.fase_3) nuevasFases["3"] = args.fase_3;
+              if (args.fase_4) nuevasFases["4"] = args.fase_4;
+              if (args.fase_5) nuevasFases["5"] = args.fase_5;
+              
+              window.plannerContext.setProyectoActual(prev => {
+                const updatedFases = { ...prev.fases_contenido, ...nuevasFases };
+                return { ...prev, fases_contenido: updatedFases };
+              });
+              acted = true;
             }
           }
         }
-        return "¡Listo! He rellenado los campos de tu planeación. Revísalos y modifícalos si lo necesitas.";
+        if (acted) {
+          return "¡Listo! He rellenado los campos de tu formato. Revísalos y modifícalos si lo necesitas.";
+        }
       }
 
       return responseMessage.content;
