@@ -30,20 +30,20 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
     let userPrompt = "";
 
     if (tipoMaterial === 'EXAMEN_OPCION_MULTIPLE') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"una sola palabra clave en ingles para buscar imagen (ej. photosynthesis)\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }";
-      userPrompt = `Genera un examen de opción múltiple de ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una sola palabra real en inglés que describa la pregunta (ej: 'apple', 'sun', 'car').";
+      userPrompt = `Genera un examen de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
     } else if (tipoMaterial === 'EXAMEN_TRIMESTRAL') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"una sola palabra clave en ingles para buscar imagen (ej. history)\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }";
-      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple de ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una palabra real en inglés que describa la pregunta.";
+      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado.`;
     } else if (tipoMaterial === 'PREGUNTAS_ABIERTAS') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"...\" } ] }";
-      userPrompt = `Genera un cuestionario de ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\" } ] }. El arreglo 'preguntas' DEBE tener la cantidad exacta de preguntas solicitadas. En 'keyword_imagen_ingles' pon una palabra real en inglés.";
+      userPrompt = `Genera un cuestionario con EXACTAMENTE ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
     } else if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }";
-      userPrompt = `Genera una lista de 15 palabras clave y sus definiciones para armar una sopa de letras sobre el tema: "${tema}". La palabra en mayúsculas y sin espacios.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }. El arreglo 'palabras' DEBE tener la cantidad solicitada.";
+      userPrompt = `Genera una lista de EXACTAMENTE ${cantidadReactivos} palabras clave y sus definiciones para armar una sopa de letras sobre el tema: "${tema}". La palabra en mayúsculas y sin espacios.`;
     } else if (tipoMaterial === 'CRUCIGRAMA') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }";
-      userPrompt = `Genera una lista de 10-15 palabras clave y sus definiciones cortas (como pistas de crucigrama) sobre el tema: "${tema}". Adecuado para ${grado}º grado. La palabra debe estar en mayúsculas y sin espacios.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }. El arreglo 'palabras' DEBE tener la cantidad solicitada.";
+      userPrompt = `Genera una lista de EXACTAMENTE ${cantidadReactivos} palabras clave y sus definiciones cortas (como pistas de crucigrama) sobre el tema: "${tema}". Adecuado para ${grado}º grado. La palabra debe estar en mayúsculas y sin espacios.`;
     }
 
     try {
