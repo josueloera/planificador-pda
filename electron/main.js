@@ -91,6 +91,19 @@ app.on('window-all-closed', () => {
 });
 
 // ================= HANDLERS =================
+const licenseManager = require('./licenseManager');
+
+ipcMain.handle('get-license-status', () => {
+  return licenseManager.getLicenseStatus();
+});
+
+ipcMain.handle('activate-license', (event, key) => {
+  return licenseManager.activateLicense(key);
+});
+
+ipcMain.handle('start-trial', () => {
+  return licenseManager.startTrial();
+});
 
 // --- TRUCO MAESTRO: FORZAR FOCO AUNQUE SE PIERDA ---
 ipcMain.handle('app-focus', () => {

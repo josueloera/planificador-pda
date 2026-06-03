@@ -4,6 +4,7 @@ import './App.css';
 // --- IMPORTACIONES (Si alguna falla, el código tiene protección) ---
 import { obtenerPlanSemanal } from './planner_logic'; 
 import GeneradorMaterial from './components/GeneradorMaterial';
+import Licencia from './components/Licencia';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
@@ -79,6 +80,10 @@ const TIPOS_EVENTO = {
 function App() {
   const [vista, setVista] = useState('MENU');
   
+  // LICENCIA
+  const [licenciaInfo, setLicenciaInfo] = useState(null);
+  const [cargandoLicencia, setCargandoLicencia] = useState(true);
+
   // ESTADOS
   const [alumnos, setAlumnos] = useState([]);
   const [grado, setGrado] = useState(() => localStorage.getItem('grado') ? parseInt(localStorage.getItem('grado')) : 3);
@@ -164,6 +169,18 @@ function App() {
   }, [vista, proyectoActual, planData, pdasSemana]);
 
   // --- CARGAS INICIALES ---
+  useEffect(() => {
+    if (ipcRenderer) {
+      ipcRenderer.invoke('get-license-status').then(res => {
+        setLicenciaInfo(res);
+        setCargandoLicencia(false);
+      });
+    } else {
+      // Si corre en web pura sin electron
+      setCargandoLicencia(false);
+    }
+  }, []);
+
   useEffect(() => { if(ipcRenderer) ipcRenderer.invoke('get-alumnos').then(r => setAlumnos(r || [])).catch(console.error); }, [vista]);
   useEffect(() => { if(ipcRenderer && vista==='CALENDARIO'){ ipcRenderer.invoke('get-eventos-oficiales').then(setEventosSEP); } }, [vista, mesCal, anioCal]);
   useEffect(() => { if(ipcRenderer) { ipcRenderer.invoke('get-comisiones').then(res => { setComisiones(res || []); }); ipcRenderer.invoke('get-vistos').then(res => setVistos(res || {})); } }, [vista]);
@@ -396,6 +413,18 @@ function App() {
   };
 
   // ================= RENDERIZADO =================
+  if (cargandoLicencia) {
+    return <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', fontSize:'1.5rem', color:'#555'}}>Verificando licencia...</div>;
+  }
+
+  // Si requiere activación y no está en prueba válida
+  if (licenciaInfo && !licenciaInfo.isActivated && !licenciaInfo.isTrialValid) {
+    return <Licencia onActivated={() => {
+      // Recargar estado de licencia
+      ipcRenderer.invoke('get-license-status').then(res => setLicenciaInfo(res));
+    }} />;
+  }
+
   if(vista === 'MENU') {
     const menuItems = [
       { id: 'GRUPO', icon: '👥', label: 'Mi Grupo', desc: `${alumnos.length} alumnos`, color: '#6C5CE7', action: ()=>setVista('GRUPO') },
@@ -415,6 +444,11 @@ function App() {
             <div className="menu-header-glow"></div>
             <h1 className="titulo-principal">PLANIFICADOR DOCENTE</h1>
             <p className="menu-subtitle">Ciclo Escolar 2025 - 2026</p>
+            {licenciaInfo && licenciaInfo.isTrialValid && !licenciaInfo.isActivated && (
+                <div style={{background: '#f39c12', color: 'white', padding: '5px 15px', borderRadius: '15px', display: 'inline-block', marginTop: '10px', fontSize: '0.9rem', fontWeight: 'bold'}}>
+                    Prueba Gratuita: {licenciaInfo.trialDaysRemaining} días restantes
+                </div>
+            )}
             <div className="menu-grado-selector">
                 {[1,2,3,4,5,6].map(g => (
                     <button key={g} className={`menu-grado-btn ${grado === g ? 'activo' : ''}`} onClick={() => { setGrado(g); localStorage.setItem('grado', g); }}>
