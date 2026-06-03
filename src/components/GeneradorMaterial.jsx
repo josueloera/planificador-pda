@@ -30,14 +30,14 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
     let userPrompt = "";
 
     if (tipoMaterial === 'EXAMEN_OPCION_MULTIPLE') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave_o_vacio\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon SIEMPRE una palabra real en inglés que describa visualmente la pregunta (ej: 'apple', 'sun', 'fraction', 'map'). Sólo déjalo vacío \"\" si es un concepto 100% abstracto imposible de ilustrar.";
-      userPrompt = `Genera un examen de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. IMPORTANTE: Las preguntas deben estar contextualizadas en situaciones prácticas, problemas comunitarios o de la vida real de estudiantes en México (enfoque de la Nueva Escuela Mexicana). Evita preguntas puramente enciclopédicas o memorísticas.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"svg_ilustracion\": \"codigo_svg_o_vacio\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener la cantidad de elementos solicitados. En 'svg_ilustracion' genera el código puro de un SVG MUY SIMPLE en blanco y negro (viewBox='0 0 100 100') que ilustre la pregunta (ej. figuras geométricas, fracciones) SÓLO SI es indispensable. Si no necesita imagen, déjalo vacío \"\".";
+      userPrompt = `Genera un examen de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. IMPORTANTE: Las preguntas deben estar contextualizadas en situaciones prácticas de la vida real en México. Evita preguntas puramente memorísticas.`;
     } else if (tipoMaterial === 'EXAMEN_TRIMESTRAL') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave_o_vacio\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon SIEMPRE una palabra real en inglés que describa visualmente la pregunta. Sólo déjalo vacío \"\" si es un concepto abstracto imposible de ilustrar.";
-      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado. Las preguntas deben presentar casos, situaciones o problemas de la vida comunitaria y escolar (enfoque NEM) para fomentar el pensamiento crítico.`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"svg_ilustracion\": \"codigo_svg_o_vacio\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener la cantidad de elementos solicitados. En 'svg_ilustracion' genera el código de un SVG MUY SIMPLE en blanco y negro SÓLO SI la pregunta necesita apoyo visual. Si no, déjalo vacío \"\".";
+      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado. Presenta casos de la vida comunitaria escolar.`;
     } else if (tipoMaterial === 'PREGUNTAS_ABIERTAS') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave_o_vacio\" } ] }. El arreglo 'preguntas' DEBE tener la cantidad exacta de preguntas solicitadas. En 'keyword_imagen_ingles' pon SIEMPRE una palabra real en inglés que describa visualmente la pregunta. Sólo déjalo vacío \"\" si es un concepto 100% abstracto.";
-      userPrompt = `Genera un cuestionario con EXACTAMENTE ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. Las preguntas deben invitar al estudiante a reflexionar sobre su entorno comunitario y social (enfoque NEM).`;
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"svg_ilustracion\": \"codigo_svg_o_vacio\" } ] }. El arreglo 'preguntas' DEBE tener la cantidad exacta de preguntas solicitadas. En 'svg_ilustracion' pon código SVG simple SÓLO SI es indispensable. Si no, déjalo vacío \"\".";
+      userPrompt = `Genera un cuestionario con EXACTAMENTE ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
     } else if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }. El arreglo 'palabras' DEBE tener la cantidad solicitada.";
       userPrompt = `Genera una lista de EXACTAMENTE ${cantidadReactivos} palabras clave y sus definiciones para armar una sopa de letras sobre el tema: "${tema}". La palabra en mayúsculas y sin espacios.`;
@@ -211,9 +211,8 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
                       ))}
                     </div>
                   </div>
-                  {q.keyword_imagen_ingles && q.keyword_imagen_ingles.trim() !== '' && q.keyword_imagen_ingles !== 'palabra_clave_o_vacio' && (
-                    <div style={{ width: '150px', border: '1px solid #eee', padding: '5px', borderRadius: '8px' }}>
-                      <img src={`https://loremflickr.com/300/300/${encodeURIComponent(q.keyword_imagen_ingles)}`} alt="Ilustración de la pregunta" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
+                  {q.svg_ilustracion && q.svg_ilustracion.trim() !== '' && q.svg_ilustracion !== 'codigo_svg_o_vacio' && q.svg_ilustracion.startsWith('<svg') && (
+                    <div style={{ width: '150px', height: '150px', border: '2px solid #000', padding: '10px', borderRadius: '8px', background: 'white' }} dangerouslySetInnerHTML={{ __html: q.svg_ilustracion }}>
                     </div>
                   )}
                 </div>
@@ -240,9 +239,8 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
                     <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
                     <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
                   </div>
-                  {q.keyword_imagen_ingles && q.keyword_imagen_ingles.trim() !== '' && q.keyword_imagen_ingles !== 'palabra_clave_o_vacio' && (
-                    <div style={{ width: '120px', border: '1px solid #eee', padding: '5px', borderRadius: '8px' }}>
-                      <img src={`https://loremflickr.com/300/300/${encodeURIComponent(q.keyword_imagen_ingles)}`} alt="Ilustración" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
+                  {q.svg_ilustracion && q.svg_ilustracion.trim() !== '' && q.svg_ilustracion !== 'codigo_svg_o_vacio' && q.svg_ilustracion.startsWith('<svg') && (
+                    <div style={{ width: '120px', height: '120px', border: '2px solid #000', padding: '10px', borderRadius: '8px', background: 'white' }} dangerouslySetInnerHTML={{ __html: q.svg_ilustracion }}>
                     </div>
                   )}
                 </div>
