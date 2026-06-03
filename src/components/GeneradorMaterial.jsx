@@ -30,13 +30,13 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
     let userPrompt = "";
 
     if (tipoMaterial === 'EXAMEN_OPCION_MULTIPLE') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una sola palabra real en inglés que describa la pregunta (ej: 'apple', 'sun', 'car').";
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave_o_vacio\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una palabra real en inglés SÓLO SI la pregunta necesita indispensablemente un apoyo visual (ej: fracciones, mapas, geometría). Si no lo necesita, déjalo vacío \"\".";
       userPrompt = `Genera un examen de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. IMPORTANTE: Las preguntas deben estar contextualizadas en situaciones prácticas, problemas comunitarios o de la vida real de estudiantes en México (enfoque de la Nueva Escuela Mexicana). Evita preguntas puramente enciclopédicas o memorísticas.`;
     } else if (tipoMaterial === 'EXAMEN_TRIMESTRAL') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una palabra real en inglés que describa la pregunta.";
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave_o_vacio\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una palabra real en inglés SÓLO SI la pregunta necesita apoyo visual. Si no, déjalo vacío \"\".";
       userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado. Las preguntas deben presentar casos, situaciones o problemas de la vida comunitaria y escolar (enfoque NEM) para fomentar el pensamiento crítico.`;
     } else if (tipoMaterial === 'PREGUNTAS_ABIERTAS') {
-      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\" } ] }. El arreglo 'preguntas' DEBE tener la cantidad exacta de preguntas solicitadas. En 'keyword_imagen_ingles' pon una palabra real en inglés.";
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave_o_vacio\" } ] }. El arreglo 'preguntas' DEBE tener la cantidad exacta de preguntas solicitadas. En 'keyword_imagen_ingles' pon una palabra real en inglés SÓLO SI la pregunta necesita apoyo visual. Si no, déjalo vacío \"\".";
       userPrompt = `Genera un cuestionario con EXACTAMENTE ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. Las preguntas deben invitar al estudiante a reflexionar sobre su entorno comunitario y social (enfoque NEM).`;
     } else if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }. El arreglo 'palabras' DEBE tener la cantidad solicitada.";
@@ -211,9 +211,9 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
                       ))}
                     </div>
                   </div>
-                  {q.keyword_imagen_ingles && (
+                  {q.keyword_imagen_ingles && q.keyword_imagen_ingles.trim() !== '' && q.keyword_imagen_ingles !== 'palabra_clave_o_vacio' && (
                     <div style={{ width: '150px', border: '1px solid #eee', padding: '5px', borderRadius: '8px' }}>
-                      <img src={`https://image.pollinations.ai/prompt/${encodeURIComponent(q.keyword_imagen_ingles)}?width=300&height=300&nologo=true`} alt="Ilustración de la pregunta" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
+                      <img src={`https://loremflickr.com/300/300/${encodeURIComponent(q.keyword_imagen_ingles)}`} alt="Ilustración de la pregunta" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
                     </div>
                   )}
                 </div>
@@ -240,9 +240,9 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
                     <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
                     <div style={{ borderBottom: '1px dashed #ccc', height: '30px' }}></div>
                   </div>
-                  {q.keyword_imagen_ingles && (
+                  {q.keyword_imagen_ingles && q.keyword_imagen_ingles.trim() !== '' && q.keyword_imagen_ingles !== 'palabra_clave_o_vacio' && (
                     <div style={{ width: '120px', border: '1px solid #eee', padding: '5px', borderRadius: '8px' }}>
-                      <img src={`https://image.pollinations.ai/prompt/${encodeURIComponent(q.keyword_imagen_ingles)}?width=240&height=240&nologo=true`} alt="Ilustración" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
+                      <img src={`https://loremflickr.com/300/300/${encodeURIComponent(q.keyword_imagen_ingles)}`} alt="Ilustración" style={{ width: '100%', height: 'auto', borderRadius: '4px' }} />
                     </div>
                   )}
                 </div>
