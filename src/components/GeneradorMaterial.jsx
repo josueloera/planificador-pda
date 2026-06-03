@@ -31,19 +31,22 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
 
     if (tipoMaterial === 'EXAMEN_OPCION_MULTIPLE') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una sola palabra real en inglés que describa la pregunta (ej: 'apple', 'sun', 'car').";
-      userPrompt = `Genera un examen de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+      userPrompt = `Genera un examen de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. IMPORTANTE: Las preguntas deben estar contextualizadas en situaciones prácticas, problemas comunitarios o de la vida real de estudiantes en México (enfoque de la Nueva Escuela Mexicana). Evita preguntas puramente enciclopédicas o memorísticas.`;
     } else if (tipoMaterial === 'EXAMEN_TRIMESTRAL') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\", \"opciones\": [\"A) ...\", \"B) ...\", \"C) ...\"], \"respuesta_correcta\": 0 } ] }. El arreglo 'preguntas' DEBE tener exactamente la cantidad de elementos solicitados por el usuario. En 'keyword_imagen_ingles' pon una palabra real en inglés que describa la pregunta.";
-      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado.`;
+      userPrompt = `Genera un riguroso Examen Trimestral de opción múltiple con EXACTAMENTE ${cantidadReactivos} preguntas integradoras y complejas que abarquen aprendizajes de todo el periodo relacionados con el tema: "${tema}". Para ${grado}º grado. Las preguntas deben presentar casos, situaciones o problemas de la vida comunitaria y escolar (enfoque NEM) para fomentar el pensamiento crítico.`;
     } else if (tipoMaterial === 'PREGUNTAS_ABIERTAS') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"preguntas\": [ { \"pregunta\": \"...\", \"keyword_imagen_ingles\": \"palabra_clave\" } ] }. El arreglo 'preguntas' DEBE tener la cantidad exacta de preguntas solicitadas. En 'keyword_imagen_ingles' pon una palabra real en inglés.";
-      userPrompt = `Genera un cuestionario con EXACTAMENTE ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria.`;
+      userPrompt = `Genera un cuestionario con EXACTAMENTE ${cantidadReactivos} preguntas abiertas de análisis y reflexión sobre el tema: "${tema}". Adecuado para ${grado}º grado de primaria. Las preguntas deben invitar al estudiante a reflexionar sobre su entorno comunitario y social (enfoque NEM).`;
     } else if (tipoMaterial === 'SOPA_LETRAS_VOCABULARIO') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }. El arreglo 'palabras' DEBE tener la cantidad solicitada.";
       userPrompt = `Genera una lista de EXACTAMENTE ${cantidadReactivos} palabras clave y sus definiciones para armar una sopa de letras sobre el tema: "${tema}". La palabra en mayúsculas y sin espacios.`;
     } else if (tipoMaterial === 'CRUCIGRAMA') {
       systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"palabras\": [ { \"palabra\": \"...\", \"pista\": \"...\" } ] }. El arreglo 'palabras' DEBE tener la cantidad solicitada.";
       userPrompt = `Genera una lista de EXACTAMENTE ${cantidadReactivos} palabras clave y sus definiciones cortas (como pistas de crucigrama) sobre el tema: "${tema}". Adecuado para ${grado}º grado. La palabra debe estar en mayúsculas y sin espacios.`;
+    } else if (tipoMaterial === 'RUBRICA_EVALUACION') {
+      systemPrompt += " Devuelve ÚNICAMENTE un JSON con este formato: { \"titulo\": \"...\", \"criterios\": [ { \"criterio\": \"...\", \"excelente\": \"...\", \"bueno\": \"...\", \"suficiente\": \"...\", \"insuficiente\": \"...\" } ] }.";
+      userPrompt = `Genera una rúbrica de evaluación formativa analítica (enfoque NEM) con 5 criterios detallados para evaluar el tema o proyecto: "${tema}". Adecuada para ${grado}º grado de primaria.`;
     }
 
     try {
@@ -125,6 +128,7 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
             <option value="PREGUNTAS_ABIERTAS">❓ Cuestionario (Preguntas Abiertas)</option>
             <option value="SOPA_LETRAS_VOCABULARIO">🔠 Sopa de Letras</option>
             <option value="CRUCIGRAMA">➕ Crucigrama Clásico</option>
+            <option value="RUBRICA_EVALUACION">📊 Rúbrica de Evaluación</option>
           </select>
 
           {(tipoMaterial.includes('EXAMEN') || tipoMaterial.includes('PREGUNTAS')) && (
@@ -328,6 +332,45 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
                     <p key={i} style={{ margin: '5px 0', fontSize: '0.9rem' }}><strong>{p.position}.</strong> {p.clue}</p>
                   ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Renderizado de Rúbrica de Evaluación */}
+          {resultado.tipo === 'RUBRICA_EVALUACION' && (
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                <h1 style={{ fontSize: '1.5rem', textTransform: 'uppercase' }}>{resultado.data.titulo}</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', borderBottom: '1px solid #000', paddingBottom: '5px' }}>
+                  <span>Nombre del alumno: _________________________________________</span>
+                  <span>Fecha: ______________</span>
+                </div>
+              </div>
+              
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginTop: '20px' }}>
+                <thead>
+                  <tr style={{ background: '#f0f0f0' }}>
+                    <th style={{ border: '1px solid #000', padding: '10px' }}>Criterio</th>
+                    <th style={{ border: '1px solid #000', padding: '10px' }}>Excelente (4)</th>
+                    <th style={{ border: '1px solid #000', padding: '10px' }}>Bueno (3)</th>
+                    <th style={{ border: '1px solid #000', padding: '10px' }}>Suficiente (2)</th>
+                    <th style={{ border: '1px solid #000', padding: '10px' }}>Insuficiente (1)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resultado.data.criterios.map((c, i) => (
+                    <tr key={i}>
+                      <td style={{ border: '1px solid #000', padding: '10px', fontWeight: 'bold' }}>{c.criterio}</td>
+                      <td style={{ border: '1px solid #000', padding: '10px', fontSize: '0.9rem' }}>{c.excelente}</td>
+                      <td style={{ border: '1px solid #000', padding: '10px', fontSize: '0.9rem' }}>{c.bueno}</td>
+                      <td style={{ border: '1px solid #000', padding: '10px', fontSize: '0.9rem' }}>{c.suficiente}</td>
+                      <td style={{ border: '1px solid #000', padding: '10px', fontSize: '0.9rem' }}>{c.insuficiente}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ marginTop: '20px', textAlign: 'right' }}>
+                <strong>Puntaje Total: ____ / {resultado.data.criterios.length * 4}</strong>
               </div>
             </div>
           )}
