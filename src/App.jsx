@@ -5,13 +5,14 @@ import './App.css';
 import { obtenerPlanSemanal } from './planner_logic'; 
 import GeneradorMaterial from './components/GeneradorMaterial';
 import Licencia from './components/Licencia';
+import ConfiguracionCiclo from './components/ConfiguracionCiclo';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
 // --- CONFIGURACIÓN GLOBAL ---
-const FECHA_INICIO_CICLO = new Date(2025, 7, 25); 
+export const DEFAULT_FECHA_INICIO = new Date(2025, 7, 25); // 25 Agosto 2025
 
-const PERIODOS = { 
+export const DEFAULT_PERIODOS = { 
   1: { nombre: '1º Trimestre', inicio: '2025-08-26', fin: '2025-11-30' }, 
   2: { nombre: '2º Trimestre', inicio: '2025-12-01', fin: '2026-03-20' }, 
   3: { nombre: '3º Trimestre', inicio: '2026-03-21', fin: '2026-07-16' } 
@@ -26,8 +27,8 @@ const CAMPOS_FORMATIVOS = [
 
 const NOMBRES_MESES = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
-const obtenerFechasSemana = (numSemana) => {
-  let inicio = new Date(FECHA_INICIO_CICLO);
+const obtenerFechasSemana = (numSemana, fechaInicioObj = DEFAULT_FECHA_INICIO) => {
+  let inicio = new Date(fechaInicioObj);
   inicio.setDate(inicio.getDate() + ((numSemana - 1) * 7));
   let fin = new Date(inicio);
   fin.setDate(fin.getDate() + 4); 
@@ -87,6 +88,7 @@ function App() {
   // ESTADOS
   const [alumnos, setAlumnos] = useState([]);
   const [grado, setGrado] = useState(() => localStorage.getItem('grado') ? parseInt(localStorage.getItem('grado')) : 3);
+  const [configCiclo, setConfigCiclo] = useState({ fechaInicioStr: '2025-08-25', periodos: DEFAULT_PERIODOS });
   
   // EVALUACIÓN
   const [criterios, setCriterios] = useState([]); 
@@ -175,6 +177,14 @@ function App() {
         setLicenciaInfo(res);
         setCargandoLicencia(false);
       });
+      ipcRenderer.invoke('get-config').then(cfg => {
+        if (cfg.fechaInicioStr || cfg.periodos) {
+            setConfigCiclo({
+                fechaInicioStr: cfg.fechaInicioStr || '2025-08-25',
+                periodos: cfg.periodos ? JSON.parse(cfg.periodos) : DEFAULT_PERIODOS
+            });
+        }
+      });
     } else {
       // Si corre en web pura sin electron
       setCargandoLicencia(false);
@@ -209,6 +219,9 @@ function App() {
         }
 
         // Generar Dosificador Dinámico
+        const [anio, mes, dia] = configCiclo.fechaInicioStr.split('-');
+        const fechaInicioObj = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia));
+        
         const dosif = SEMANAS_CLASE.map(s => {
             // Distribuimos los PDAs secuencialmente a través de las 42 semanas
             const pdasEstaSemana = filePdas.filter((_, idx) => (idx % 42) + 1 === s.id).map(p => ({
@@ -216,7 +229,7 @@ function App() {
                 pda: p.descripcion,
                 nota: false
             }));
-            return { ...s, pdas: pdasEstaSemana, fechas: obtenerFechasSemana(s.id) };
+            return { ...s, pdas: pdasEstaSemana, fechas: obtenerFechasSemana(s.id, fechaInicioObj) };
         });
         setPlanDosif(dosif);
 
@@ -296,7 +309,7 @@ function App() {
   const generarReporteTrimestral = () => {
       if (!ipcRenderer || alumnos.length === 0) return;
       setCargandoReporte(true);
-      const periodo = PERIODOS[trimestre];
+      const periodo = configCiclo.periodos[trimestre];
       Promise.all([ ipcRenderer.invoke('get-criterios'), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin) ]).then(([todosCriterios, todasNotas]) => {
           const reporte = alumnos.map(alumno => {
               const fila = { id: alumno.id, nombre: alumno.nombre };
@@ -437,6 +450,7 @@ function App() {
       { id: 'PROYECTOS', icon: '🚀', label: 'Proyectos', desc: 'Didácticos NEM', color: '#00CEC9', action: ()=>{setVista('PROYECTOS'); ipcRenderer.invoke('get-proyectos', grado).then(setListaProyectos);} },
       { id: 'BITACORA', icon: '📂', label: 'Bitácora', desc: 'Fichas e incidencias', color: '#636E72', action: ()=>{setVista('BITACORA'); setAlumnoBitacora(null);} },
       { id: 'MATERIALES', icon: '🧩', label: 'Materiales', desc: 'Exámenes y juegos', color: '#FF9F43', action: ()=>setVista('MATERIALES') },
+      { id: 'CONFIG', icon: '⚙️', label: 'Ajustes Ciclo', desc: 'Fechas y SEP', color: '#2C3E50', action: ()=>setVista('CONFIG') },
     ];
     return (
     <div className="pantalla-menu">
@@ -471,6 +485,23 @@ function App() {
 
   if(vista === 'MATERIALES') {
       return <GeneradorMaterial onVolver={() => setVista('MENU')} pdasDisponibles={pdasDisponibles} grado={grado} />;
+  }
+
+  if(vista === 'CONFIG') {
+      return <ConfiguracionCiclo onVolver={() => {
+          setVista('MENU');
+          // Reload config
+          ipcRenderer.invoke('get-config').then(cfg => {
+            if (cfg.fechaInicioStr || cfg.periodos) {
+                setConfigCiclo({
+                    fechaInicioStr: cfg.fechaInicioStr || '2025-08-25',
+                    periodos: cfg.periodos ? JSON.parse(cfg.periodos) : DEFAULT_PERIODOS
+                });
+            }
+          });
+      }} 
+      currentConfig={configCiclo} 
+      defaultConfig={{fechaInicioStr: '2025-08-25', periodos: DEFAULT_PERIODOS}} />;
   }
 
   if(vista === 'EVAL') { 
@@ -538,7 +569,7 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
   ); }
   // Resto de vistas (Bitácora, Dosif, etc.)
   if(vista === 'BITACORA') return ( <div className="pantalla-dosificador" style={{flexDirection:'row', padding:0}}> <div className="sidebar-lista"><div style={{padding:15, background:'#004aad', color:'white'}}><h3>📂 Alumnos</h3><button onClick={()=>setVista('MENU')} style={{color:'black'}}>Salir</button></div><ul className="lista-alumnos-simple">{alumnos.map(a=><li key={a.id} onClick={()=>selAlumnoBitacora(a)} className={alumnoBitacora?.id===a.id?'activo':''}>{a.nombre}</li>)}</ul></div> <div className="contenido-bitacora" style={{padding:20, flexGrow:1, overflowY:'auto'}}> {!alumnoBitacora ? <div style={{textAlign:'center', marginTop:100, color:'#999'}}><h2>👈 Selecciona un alumno</h2></div> : ( <> <div className="header-alumno"><h2 style={{color:'#004aad'}}>👤 {alumnoBitacora.nombre}</h2><div className="tabs-bitacora"><button className={tabBitacora==='PERFIL'?'activo':''} onClick={()=>setTabBitacora('PERFIL')}>📋 Ficha Técnica</button><button className={tabBitacora==='INCIDENCIAS'?'activo':''} onClick={()=>setTabBitacora('INCIDENCIAS')}>⚠️ Incidencias</button></div></div> {tabBitacora==='PERFIL' ? ( <form className="form-perfil" onSubmit={savePerfil}> <div className="seccion-form"> <h4>Datos Personales</h4> <div className="grid-dos"> <input name="curp" defaultValue={perfil.curp} placeholder="CURP" /> <input name="f_nacimiento" type="date" defaultValue={perfil.f_nacimiento} placeholder="Fecha Nacimiento" /> </div> <div className="grid-dos" style={{marginTop:10}}> <input name="edad" defaultValue={perfil.edad} placeholder="Edad" style={{width:80}} /> <input name="peso" defaultValue={perfil.peso} placeholder="Peso (kg)" /> <input name="estatura" defaultValue={perfil.estatura} placeholder="Estatura (cm)" /> </div> <div className="grid-dos" style={{marginTop:10}}> <input name="tipo_sangre" defaultValue={perfil.tipo_sangre} placeholder="Tipo Sangre" /> <input name="servicio_medico" defaultValue={perfil.servicio_medico} placeholder="Servicio Médico" /> </div> <input name="alergias" defaultValue={perfil.alergias} placeholder="Alergias / Padecimientos" style={{width:'100%', marginTop:10}}/> <input name="direccion" defaultValue={perfil.direccion} placeholder="Dirección completa" style={{width:'100%', marginTop:10}}/> </div> <div className="seccion-form"> <h4>Datos de Padres / Tutores</h4> <div className="grid-dos"><input name="nombre_mama" defaultValue={perfil.nombre_mama} placeholder="Nombre Madre"/><input name="tel_mama" defaultValue={perfil.tel_mama} placeholder="Teléfono"/></div> <div className="grid-dos" style={{marginTop:10}}><input name="nombre_papa" defaultValue={perfil.nombre_papa} placeholder="Nombre Padre"/><input name="tel_papa" defaultValue={perfil.tel_papa} placeholder="Teléfono"/></div> <textarea name="otros_datos" defaultValue={perfil.otros_datos} placeholder="Otros datos relevantes..." style={{width:'100%', marginTop:10, height:60}}></textarea> </div> <button className="btn-guardar">💾 Guardar Ficha</button> </form> ) : ( <div className="panel-incidencias"><div className="nueva-incidencia"><input type="date" value={fechaInc} onChange={e=>setFechaInc(e.target.value)}/><input placeholder="Situación" value={formInc.situacion} onChange={e=>setFormInc({...formInc, situacion:e.target.value})} style={{width:'100%'}}/><input placeholder="Acuerdos / Medidas" value={formInc.medidas} onChange={e=>setFormInc({...formInc, medidas:e.target.value})} style={{width:'100%'}}/><button onClick={saveInc} className="btn-guardar">Agregar</button></div><div className="lista-reportes">{incidencias.map(i=><div key={i.id} className="tarjeta-incidencia"><b>{i.fecha}</b>: {i.situacion}<br/><small>{i.medidas}</small></div>)}</div></div> )} </> )} </div> </div> );
-  if(vista==='TRIMESTRAL') return (<div className="pantalla-dosificador"><div className="header-dosificador no-print"><h2>Trimestral</h2><div style={{display:'flex', gap:10}}><button className="btn-guardar" onClick={generarReporteTrimestral}>{cargandoReporte ? '⏳...' : '🔄 Recalcular'}</button><button className="btn-volver" onClick={()=>window.print()}>🖨️ Imprimir</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div></div><div className="tabs-trimestres no-print">{[1,2,3].map(id=><button key={id} className={`tab-btn ${trimestre===id?'activo':''}`} onClick={()=>setTrimestre(id)}>{PERIODOS[id].nombre}</button>)}</div><div className="tabla-container"><table className="tabla-eval"><thead><tr><th>ALUMNO</th><th>LENGUAJES</th><th>SABERES</th><th>ÉTICA</th><th>HUMANO</th><th style={{background:'#2c3e50', color:'white'}}>FINAL</th></tr></thead><tbody>{(resumen || []).map(r=><tr key={r.id}><td className="celda-nombre">{r.nombre}</td><td>{r.LENGUAJES}</td><td>{r.SABERES}</td><td>{r.ETICA}</td><td>{r.HUMANO}</td><td style={{textAlign:'center', fontWeight:'bold', fontSize:'1.2rem', background:getColorSemaforo(r.promedioFinal, true)}}>{r.promedioFinal}</td></tr>)}</tbody></table></div></div>);
+  if(vista==='TRIMESTRAL') return (<div className="pantalla-dosificador"><div className="header-dosificador no-print"><h2>Trimestral</h2><div style={{display:'flex', gap:10}}><button className="btn-guardar" onClick={generarReporteTrimestral}>{cargandoReporte ? '⏳...' : '🔄 Recalcular'}</button><button className="btn-volver" onClick={()=>window.print()}>🖨️ Imprimir</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div></div><div className="tabs-trimestres no-print">{[1,2,3].map(id=><button key={id} className={`tab-btn ${trimestre===id?'activo':''}`} onClick={()=>setTrimestre(id)}>{configCiclo.periodos[id].nombre}</button>)}</div><div className="tabla-container"><table className="tabla-eval"><thead><tr><th>ALUMNO</th><th>LENGUAJES</th><th>SABERES</th><th>ÉTICA</th><th>HUMANO</th><th style={{background:'#2c3e50', color:'white'}}>FINAL</th></tr></thead><tbody>{(resumen || []).map(r=><tr key={r.id}><td className="celda-nombre">{r.nombre}</td><td>{r.LENGUAJES}</td><td>{r.SABERES}</td><td>{r.ETICA}</td><td>{r.HUMANO}</td><td style={{textAlign:'center', fontWeight:'bold', fontSize:'1.2rem', background:getColorSemaforo(r.promedioFinal, true)}}>{r.promedioFinal}</td></tr>)}</tbody></table></div></div>);
   if(vista === 'DOSIF') return ( <div className="pantalla-dosificador"> <div className="header-dosificador no-print"> <h2>Dosificador Anual</h2> <button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button> </div> <div className="tabla-semanal"> {planDosif.map(s => { const isVisto = (vistos.dosif || []).includes(String(s.id)); return ( <div key={s.id} className="fila-semana" style={{opacity: isVisto ? 0.6 : 1, transition: 'opacity 0.3s'}}> <div className="info-semana" style={{display:'flex', flexDirection:'column', alignItems:'flex-start'}}> <strong>Sem {s.id}</strong><br/> <small style={{fontSize:'0.75rem', color:'#eee'}}>{s.fechas}</small> <button className="no-print" onClick={()=>toggleVisto('dosif', s.id)} style={{marginTop: 5, padding: '2px 5px', fontSize: '0.7rem', cursor: 'pointer', background: isVisto ? '#2ecc71' : 'rgba(255,255,255,0.3)', color: 'white', border: '1px solid white', borderRadius: 3}}> {isVisto ? '✅ Vista' : 'Marcar vista'} </button> </div> <div className="contenido-semana"> {(s.pdas||[]).length === 0 ? <span style={{opacity:0.5, fontStyle:'italic'}}>Sin contenido</span> : (s.pdas||[]).map((p, i) => ( <div key={i} className="chip-pda" style={{backgroundColor: p.nota ? '#fff3cd' : '#e3f2fd', color: '#333'}}> <strong>{p.proyecto}</strong><br/> <small>{p.pda}</small> </div> )) } </div> </div> )})} </div> </div> );
 
   if(vista === 'PROYECTOS') {

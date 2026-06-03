@@ -51,6 +51,7 @@ db.serialize(() => {
   
   db.run(`CREATE TABLE IF NOT EXISTS comisiones (id INTEGER PRIMARY KEY, descripcion TEXT, fecha TEXT, tipo TEXT)`);
   db.run(`CREATE TABLE IF NOT EXISTS eventos_oficiales (fecha TEXT PRIMARY KEY, tipo TEXT)`);
+  db.run(`CREATE TABLE IF NOT EXISTS configuracion (llave TEXT PRIMARY KEY, valor TEXT)`);
   db.run(`CREATE TABLE IF NOT EXISTS vistos (tipo TEXT, item_id TEXT, PRIMARY KEY(tipo, item_id))`);
 });
 
@@ -242,5 +243,18 @@ ipcMain.handle('get-comisiones', async () => new Promise(r => db.all("SELECT * F
 ipcMain.handle('add-comision', async (e, c) => new Promise(r => db.run("INSERT INTO comisiones (descripcion, fecha, tipo) VALUES (?,?,?)", [c.descripcion, c.fecha, c.tipo], () => r(true))));
 ipcMain.handle('get-eventos-oficiales', async () => new Promise(r => db.all("SELECT * FROM eventos_oficiales", [], (e, rows) => { const map = {}; (rows || []).forEach(x => map[x.fecha] = x.tipo); r(map); })));
 ipcMain.handle('save-evento-oficial', async (e, fecha, tipo) => new Promise(r => { if (tipo === 'BORRAR') db.run("DELETE FROM eventos_oficiales WHERE fecha = ?", [fecha], () => r(true)); else db.run("INSERT OR REPLACE INTO eventos_oficiales (fecha, tipo) VALUES (?, ?)", [fecha, tipo], () => r(true)); }));
+ipcMain.handle('save-multiple-events', async (e, eventosObj) => {
+    return new Promise(resolve => {
+        db.serialize(() => {
+            const stmt = db.prepare("INSERT OR REPLACE INTO eventos_oficiales (fecha, tipo) VALUES (?, ?)");
+            for (const [fecha, tipo] of Object.entries(eventosObj)) {
+                stmt.run(fecha, tipo);
+            }
+            stmt.finalize(() => resolve(true));
+        });
+    });
+});
 ipcMain.handle('clear-evaluaciones-rango', async (e, f1, f2) => new Promise(r => db.run("DELETE FROM notas WHERE fecha >= ? AND fecha <= ?", [f1, f2], () => r(true))));
+ipcMain.handle('get-config', async () => new Promise(r => db.all("SELECT * FROM configuracion", [], (e, rows) => { const map = {}; (rows || []).forEach(x => map[x.llave] = x.valor); r(map); })));
+ipcMain.handle('save-config', async (e, llave, valor) => new Promise(r => db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES (?, ?)", [llave, valor], () => r(true))));
 ipcMain.handle('seed-database', async () => true);
