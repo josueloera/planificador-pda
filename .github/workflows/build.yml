@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
     - name: Checkout code
@@ -20,9 +20,6 @@ jobs:
 
     - name: Install Dependencies
       run: npm install
-
-    - name: Cross-compile native modules for x64
-      run: npx electron-builder install-app-deps --arch=x64
 
     - name: Build macOS App
       run: npm run dist -- --mac --x64
@@ -49,9 +46,6 @@ jobs:
 
     - name: Install Dependencies
       run: npm install
-
-    - name: Build native dependencies for Electron
-      run: npx electron-builder install-app-deps
 
     - name: Build Windows App
       run: npm run dist -- --win
