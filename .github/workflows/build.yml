@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
     - name: Checkout code
@@ -22,7 +22,7 @@ jobs:
       run: npm install
 
     - name: Build macOS App
-      run: npm run dist -- --mac --x64
+      run: npm run dist -- --mac --universal
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSC_IDENTITY_AUTO_DISCOVERY: false
