@@ -21,9 +21,6 @@ jobs:
     - name: Install Dependencies
       run: npm install
 
-    - name: Rebuild Native Modules (sqlite3)
-      run: npm rebuild sqlite3
-
     - name: Build macOS App
       run: npm run dist -- --mac --universal
       env:

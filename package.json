@@ -16,7 +16,6 @@
   "build": {
     "appId": "com.josue.planificador",
     "productName": "Planificador Docente",
-    "npmRebuild": false,
     "directories": {
       "output": "release"
     },
