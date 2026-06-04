@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
-const Licencia = ({ onActivated }) => {
+const Licencia = ({ onActivated, onVolver }) => {
   const [status, setStatus] = useState(null);
   const [clave, setClave] = useState('');
   const [error, setError] = useState('');
@@ -143,6 +143,21 @@ const Licencia = ({ onActivated }) => {
               Iniciar Prueba Gratuita de 7 Días
             </button>
           </div>
+        )}
+
+        {onVolver && (
+          <button 
+            onClick={onVolver}
+            style={{
+              width: '100%', padding: '12px', background: 'transparent', color: '#7f8c8d',
+              border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold',
+              cursor: 'pointer', transition: 'color 0.3s'
+            }}
+            onMouseOver={(e) => { e.target.style.color = '#34495e'; }}
+            onMouseOut={(e) => { e.target.style.color = '#7f8c8d'; }}
+          >
+            Volver a la aplicación
+          </button>
         )}
       </div>
     </div>

@@ -459,8 +459,15 @@ function App() {
             <h1 className="titulo-principal">PLANIFICADOR DOCENTE</h1>
             <p className="menu-subtitle">Ciclo Escolar 2025 - 2026</p>
             {licenciaInfo && licenciaInfo.isTrialValid && !licenciaInfo.isActivated && (
-                <div style={{background: '#f39c12', color: 'white', padding: '5px 15px', borderRadius: '15px', display: 'inline-block', marginTop: '10px', fontSize: '0.9rem', fontWeight: 'bold'}}>
-                    Prueba Gratuita: {licenciaInfo.trialDaysRemaining} días restantes
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '10px'}}>
+                    <div style={{background: '#f39c12', color: 'white', padding: '5px 15px', borderRadius: '15px', fontSize: '0.9rem', fontWeight: 'bold'}}>
+                        Prueba Gratuita: {licenciaInfo.trialDaysRemaining} días restantes
+                    </div>
+                    <button 
+                        onClick={() => setVista('LICENCIA')}
+                        style={{background: '#27ae60', color: 'white', padding: '5px 15px', borderRadius: '15px', border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'}}>
+                        🔑 Adquirir Licencia
+                    </button>
                 </div>
             )}
             <div className="menu-grado-selector">
@@ -502,6 +509,17 @@ function App() {
       }} 
       currentConfig={configCiclo} 
       defaultConfig={{fechaInicioStr: '2025-08-25', periodos: DEFAULT_PERIODOS}} />;
+  }
+
+  if (vista === 'LICENCIA') {
+      return <Licencia 
+          onActivated={() => {
+              ipcRenderer.invoke('get-license-status').then(res => setLicenciaInfo(res));
+              setVista('MENU');
+              showToast("✅ ¡Licencia activada con éxito!");
+          }} 
+          onVolver={() => setVista('MENU')}
+      />;
   }
 
   if(vista === 'EVAL') { 
