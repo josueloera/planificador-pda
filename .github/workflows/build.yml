@@ -17,10 +17,12 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        architecture: 'x64'
 
     - name: Install Dependencies
       run: npm install
+
+    - name: Cross-compile native modules for x64
+      run: npx electron-builder install-app-deps --arch=x64
 
     - name: Build macOS App
       run: npm run dist -- --mac --x64
@@ -47,6 +49,9 @@ jobs:
 
     - name: Install Dependencies
       run: npm install
+
+    - name: Build native dependencies for Electron
+      run: npx electron-builder install-app-deps
 
     - name: Build Windows App
       run: npm run dist -- --win
