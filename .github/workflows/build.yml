@@ -25,7 +25,7 @@ jobs:
       run: npm rebuild sqlite3
 
     - name: Build macOS App
-      run: npm run dist -- --mac
+      run: npm run dist -- --mac universal
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSC_IDENTITY_AUTO_DISCOVERY: false
