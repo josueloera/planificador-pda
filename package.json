@@ -1,8 +1,8 @@
 {
-  "name": "planificador-docente-josue",
+  "name": "planificador-docente-secundaria",
   "private": true,
   "version": "1.0.0",
-  "description": "Herramienta de Gestión Docente NEM",
+  "description": "Herramienta de Gestión Docente NEM - Secundaria",
   "author": "Josue Loera",
   "main": "electron/main.js",
   "scripts": {
@@ -14,8 +14,8 @@
     "dist": "vite build && electron-builder"
   },
   "build": {
-    "appId": "com.josue.planificador",
-    "productName": "Planificador Docente",
+    "appId": "com.josue.planificador.secundaria",
+    "productName": "Planificador Docente Secundaria",
     "directories": {
       "output": "release"
     },
@@ -28,6 +28,10 @@
       {
         "from": "nem_primaria.db",
         "to": "nem_primaria.db"
+      },
+      {
+        "from": "nem_universal.db",
+        "to": "nem_universal.db"
       }
     ],
     "win": {
@@ -57,6 +61,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "picomatch": "^4.0.4",
     "vite": "^5.4.1"
   }
 }

@@ -7,12 +7,35 @@ import { getLocalResponse, getRandomTip } from './assistantRules';
 // =====================================================================
 const MI_OPENAI_API_KEY = "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"; 
 
+const ChatInput = React.memo(({ onSend, isTyping }) => {
+  const [value, setValue] = useState('');
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!value.trim()) return;
+    onSend(value);
+    setValue('');
+  };
+
+  return (
+    <form className="clippy-input-area" onSubmit={handleSubmit}>
+      <input 
+        type="text" 
+        placeholder="Pregúntame sobre la NEM..." 
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        disabled={isTyping}
+      />
+      <button type="submit" disabled={isTyping || !value.trim()}>➤</button>
+    </form>
+  );
+});
+
 const ClippyAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { sender: 'bot', text: '¡Hola! Soy tu asistente de planeación impulsado por IA. ¿En qué te ayudo hoy?' }
   ]);
-  const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [tooltip, setTooltip] = useState('');
   
@@ -194,14 +217,9 @@ Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la 
     }
   };
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-
-    const userText = inputValue;
+  const handleSend = async (userText) => {
     const currentChat = [...messages];
     setMessages(prev => [...prev, { sender: 'user', text: userText }]);
-    setInputValue('');
     setIsTyping(true);
 
     let botResponse = null;
@@ -262,17 +280,7 @@ Si el usuario pide crear actividades, planear o llenar la semana, DEBES usar la 
           {isTyping && <div className="clippy-message bot">Escribiendo... ✍️</div>}
           <div ref={messagesEndRef} />
         </div>
-        
-        <form className="clippy-input-area" onSubmit={handleSend}>
-          <input 
-            type="text" 
-            placeholder="Pregúntame sobre la NEM..." 
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            disabled={isTyping}
-          />
-          <button type="submit" disabled={isTyping || !inputValue.trim()}>➤</button>
-        </form>
+        <ChatInput onSend={handleSend} isTyping={isTyping} />
       </div>
 
       {/* Avatar Flotante */}

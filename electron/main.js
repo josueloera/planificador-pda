@@ -25,21 +25,36 @@ if (app.isPackaged) {
   else { dbPath = rutaRaiz; }
 }
 
-console.log(`\n📂 BASE DE DATOS ACTIVA: ${dbPath}\n`);
+console.log(`\n📂 BASE DE DATOS DE USUARIO: ${dbPath}`);
 const db = new sqlite3.Database(dbPath);
+
+// --- 1.B GESTIÓN DE LA BASE DE DATOS UNIVERSAL (SEP) ---
+let universalDbPath;
+const universalDbName = 'nem_universal.db';
+if (app.isPackaged) {
+  universalDbPath = path.join(process.resourcesPath, universalDbName);
+} else {
+  const rutaRaizUni = path.join(__dirname, '..', universalDbName);
+  universalDbPath = fs.existsSync(rutaRaizUni) ? rutaRaizUni : path.join(__dirname, universalDbName);
+}
+console.log(`📂 BASE DE DATOS UNIVERSAL (SEP): ${universalDbPath}\n`);
+const universalDb = new sqlite3.Database(universalDbPath, sqlite3.OPEN_READONLY, (err) => {
+    if (err) console.error("Error conectando a db universal:", err);
+});
 
 // --- 2. CREACIÓN DE TABLAS ---
 db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS alumnos (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT)`);
-  db.run(`CREATE TABLE IF NOT EXISTS criterios (id INTEGER PRIMARY KEY AUTOINCREMENT, campo TEXT, nombre TEXT, porcentaje REAL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS alumnos (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, grupo_id INTEGER)`);
+  db.run(`CREATE TABLE IF NOT EXISTS criterios (id INTEGER PRIMARY KEY AUTOINCREMENT, campo TEXT, nombre TEXT, porcentaje REAL, grupo_id INTEGER)`);
   db.run(`CREATE TABLE IF NOT EXISTS notas (id INTEGER PRIMARY KEY AUTOINCREMENT, alumno_id INTEGER, criterio_id INTEGER, fecha TEXT, valor REAL)`);
   db.run(`CREATE TABLE IF NOT EXISTS perfil_alumno (alumno_id INTEGER PRIMARY KEY, curp TEXT, f_nacimiento TEXT, edad TEXT, peso TEXT, estatura TEXT, tipo_sangre TEXT, alergias TEXT, servicio_medico TEXT, direccion TEXT, nombre_mama TEXT, tel_mama TEXT, nombre_papa TEXT, tel_papa TEXT, otros_datos TEXT)`);
-  db.run(`CREATE TABLE IF NOT EXISTS incidencias (id INTEGER PRIMARY KEY AUTOINCREMENT, alumno_id INTEGER, fecha TEXT, situacion TEXT, medidas TEXT)`);
-  db.run(`CREATE TABLE IF NOT EXISTS proyectos (id INTEGER PRIMARY KEY AUTOINCREMENT, grado INTEGER, nombre TEXT, metodologia TEXT, escenario TEXT, temporalidad TEXT, problemática TEXT, pdas_seleccionados TEXT, fases_contenido TEXT)`);
+  db.run(`CREATE TABLE IF NOT EXISTS incidencias (id INTEGER PRIMARY KEY AUTOINCREMENT, alumno_id INTEGER, fecha TEXT, situacion TEXT, medidas TEXT, grupo_id INTEGER)`);
+  db.run(`CREATE TABLE IF NOT EXISTS proyectos (id INTEGER PRIMARY KEY AUTOINCREMENT, grado INTEGER, nombre TEXT, metodologia TEXT, escenario TEXT, temporalidad TEXT, problemática TEXT, pdas_seleccionados TEXT, fases_contenido TEXT, grupo_id INTEGER)`);
   
   db.run(`CREATE TABLE IF NOT EXISTS planeacion (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     grado INTEGER,
+    grupo_id INTEGER,
     semana INTEGER,
     lunes_inicio TEXT, lunes_desarrollo TEXT, lunes_cierre TEXT,
     martes_inicio TEXT, martes_desarrollo TEXT, martes_cierre TEXT,
@@ -53,6 +68,15 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS eventos_oficiales (fecha TEXT PRIMARY KEY, tipo TEXT)`);
   db.run(`CREATE TABLE IF NOT EXISTS configuracion (llave TEXT PRIMARY KEY, valor TEXT)`);
   db.run(`CREATE TABLE IF NOT EXISTS vistos (tipo TEXT, item_id TEXT, PRIMARY KEY(tipo, item_id))`);
+  
+  // Novedades para Secundaria (Múltiples Grupos)
+  db.run(`CREATE TABLE IF NOT EXISTS grupos_maestro (id INTEGER PRIMARY KEY AUTOINCREMENT, grado INTEGER, seccion TEXT, disciplina_id INTEGER, tipo TEXT, ciclo_escolar TEXT)`);
+  
+  // Migración segura para bases de datos existentes (añadir columnas sin romper si ya existen)
+  const tablasMigrar = ['alumnos', 'criterios', 'planeacion', 'proyectos', 'incidencias'];
+  tablasMigrar.forEach(tabla => {
+    db.run(`ALTER TABLE ${tabla} ADD COLUMN grupo_id INTEGER`, (err) => { /* Ignorar error si la columna ya existe */ });
+  });
 });
 
 function createWindow() {
@@ -117,9 +141,51 @@ ipcMain.handle('app-focus', () => {
     return true;
 });
 
+// -- CURRICULUM UNIVERSAL (SEP) --
+ipcMain.handle('get-campos-formativos', async () => new Promise(r => universalDb.all("SELECT * FROM campos_formativos", [], (e, rows) => r(rows || []))));
+ipcMain.handle('get-disciplinas', async () => new Promise(r => universalDb.all("SELECT * FROM disciplinas", [], (e, rows) => r(rows || []))));
+ipcMain.handle('get-disciplinas-por-grado', async (e, grado) => {
+    return new Promise(r => {
+        const query = `
+            SELECT DISTINCT d.id, d.nombre 
+            FROM disciplinas d
+            JOIN contenidos c ON c.disciplina_id = d.id
+            JOIN pdas p ON p.contenido_id = c.id
+            WHERE p.grado = ?
+            ORDER BY d.nombre ASC
+        `;
+        universalDb.all(query, [grado], (err, rows) => r(rows || []));
+    });
+});
+ipcMain.handle('get-contenidos-disciplina', async (e, d_id, f_id) => new Promise(r => universalDb.all("SELECT * FROM contenidos WHERE disciplina_id = ? AND fase_id = ?", [d_id, f_id], (e, rows) => r(rows || []))));
+ipcMain.handle('get-pdas-contenido', async (e, c_id, grado) => new Promise(r => universalDb.all("SELECT * FROM pdas WHERE contenido_id = ? AND grado = ?", [c_id, grado], (e, rows) => r(rows || []))));
+
+ipcMain.handle('get-pdas-disciplina', async (e, disciplina_id, grado) => {
+    return new Promise(r => {
+        const query = `
+            SELECT p.id, p.grado, p.descripcion as pda, c.descripcion as contenido, cf.nombre as campo
+            FROM pdas p 
+            JOIN contenidos c ON p.contenido_id = c.id 
+            JOIN disciplinas d ON c.disciplina_id = d.id
+            JOIN campos_formativos cf ON d.campo_id = cf.id
+            WHERE c.disciplina_id = ? AND p.grado = ?
+        `;
+        universalDb.all(query, [disciplina_id, grado], (err, rows) => r(rows || []));
+    });
+});
+
+// -- GRUPOS --
+ipcMain.handle('get-grupos', async () => new Promise(r => db.all("SELECT * FROM grupos_maestro", [], (e, rows) => r(rows || []))));
+ipcMain.handle('add-grupo', async (e, g) => new Promise((r, j) => db.run("INSERT INTO grupos_maestro (grado, seccion, disciplina_id, tipo, ciclo_escolar) VALUES (?, ?, ?, ?, ?)", [g.grado, g.seccion, g.disciplina_id, g.tipo, g.ciclo_escolar], function(err){ err ? j(err) : r({id: this.lastID, ...g}) })));
+ipcMain.handle('delete-grupo', async (e, id) => new Promise(r => db.run("DELETE FROM grupos_maestro WHERE id = ?", [id], () => r(true))));
+
 // -- ALUMNOS --
-ipcMain.handle('get-alumnos', async () => new Promise(r => db.all("SELECT * FROM alumnos ORDER BY nombre ASC", [], (e, rows) => r(rows || []))));
-ipcMain.handle('add-alumno', async (e, nombre) => new Promise((r, j) => db.run("INSERT INTO alumnos (nombre) VALUES (?)", [nombre], function(err){ err ? j(err) : r(this.lastID) })));
+ipcMain.handle('get-alumnos', async (e, grupo_id) => {
+    const query = grupo_id ? "SELECT * FROM alumnos WHERE grupo_id = ? ORDER BY nombre ASC" : "SELECT * FROM alumnos ORDER BY nombre ASC";
+    const params = grupo_id ? [grupo_id] : [];
+    return new Promise(r => db.all(query, params, (err, rows) => r(rows || [])));
+});
+ipcMain.handle('add-alumno', async (e, nombre, grupo_id) => new Promise((r, j) => db.run("INSERT INTO alumnos (nombre, grupo_id) VALUES (?, ?)", [nombre, grupo_id || null], function(err){ err ? j(err) : r(this.lastID) })));
 ipcMain.handle('delete-alumno', async (e, id) => new Promise(r => db.run("DELETE FROM alumnos WHERE id = ?", [id], () => r(true))));
 
 // -- VISTOS --
@@ -143,32 +209,31 @@ ipcMain.handle('toggle-visto', async (e, tipo, itemId, completado) => {
 });
 
 // -- CRITERIOS --
-ipcMain.handle('get-criterios', async (e, campo) => {
+ipcMain.handle('get-criterios', async (e, grupo_id) => {
   return new Promise(r => {
-    const query = campo ? "SELECT * FROM criterios WHERE campo = ?" : "SELECT * FROM criterios";
-    const params = campo ? [campo] : [];
-    db.all(query, params, (err, rows) => r(err ? [] : rows));
+    const query = "SELECT * FROM criterios WHERE grupo_id = ?";
+    db.all(query, [grupo_id], (err, rows) => r(err ? [] : rows));
   });
 });
 
-ipcMain.handle('save-criterios', async (e, listaCriterios, campo) => {
+ipcMain.handle('save-criterios', async (e, listaCriterios, grupo_id) => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       try {
         const idsConservados = listaCriterios.map(c => c.id).filter(id => id);
         if (idsConservados.length > 0) {
           const placeholders = idsConservados.map(() => '?').join(',');
-          db.run(`DELETE FROM criterios WHERE campo = ? AND id NOT IN (${placeholders})`, [campo, ...idsConservados], (err) => { if (err) reject(err); });
+          db.run(`DELETE FROM criterios WHERE grupo_id = ? AND id NOT IN (${placeholders})`, [grupo_id, ...idsConservados], (err) => { if (err) reject(err); });
         } else {
-          db.run("DELETE FROM criterios WHERE campo = ?", [campo], (err) => { if (err) reject(err); });
+          db.run("DELETE FROM criterios WHERE grupo_id = ?", [grupo_id], (err) => { if (err) reject(err); });
         }
         
-        const stmtInsert = db.prepare("INSERT INTO criterios (campo, nombre, porcentaje) VALUES (?, ?, ?)");
+        const stmtInsert = db.prepare("INSERT INTO criterios (grupo_id, nombre, porcentaje) VALUES (?, ?, ?)");
         const stmtUpdate = db.prepare("UPDATE criterios SET nombre = ?, porcentaje = ? WHERE id = ?");
         
         listaCriterios.forEach(c => {
           if (c.id) stmtUpdate.run(c.nombre, c.porcentaje || 0, c.id, (err) => { if (err) reject(err); });
-          else stmtInsert.run(campo, c.nombre, c.porcentaje || 0, (err) => { if (err) reject(err); });
+          else stmtInsert.run(grupo_id, c.nombre, c.porcentaje || 0, (err) => { if (err) reject(err); });
         });
         
         stmtInsert.finalize();
@@ -212,12 +277,12 @@ ipcMain.handle('get-incidencias', async (e, id) => new Promise(r => db.all("SELE
 ipcMain.handle('save-incidencia', async (e, d) => new Promise(r => db.run("INSERT INTO incidencias (alumno_id, fecha, situacion, medidas) VALUES (?,?,?,?)", [d.alumno_id, d.fecha, d.situacion, d.medidas], () => r(true))));
 
 // -- PROYECTOS --
-ipcMain.handle('get-proyectos', async (e, grado) => new Promise(r => db.all("SELECT * FROM proyectos WHERE grado = ?", [grado], (err, rows) => r(rows || []))));
+ipcMain.handle('get-proyectos', async (e, grupo_id) => new Promise(r => db.all("SELECT * FROM proyectos WHERE grupo_id = ?", [grupo_id], (err, rows) => r(rows || []))));
 ipcMain.handle('save-proyecto', async (e, p) => new Promise((resolve) => {
-  const { id, grado, nombre, metodologia, escenario, temporalidad, problemática, pdas_seleccionados, fases_contenido } = p;
+  const { id, grado, grupo_id, nombre, metodologia, escenario, temporalidad, problemática, pdas_seleccionados, fases_contenido } = p;
   const pdaStr = JSON.stringify(pdas_seleccionados); const fasesStr = JSON.stringify(fases_contenido);
   if (id) db.run("UPDATE proyectos SET nombre=?, metodologia=?, escenario=?, temporalidad=?, problemática=?, pdas_seleccionados=?, fases_contenido=? WHERE id=?", [nombre, metodologia, escenario, temporalidad, problemática, pdaStr, fasesStr, id], () => resolve(true));
-  else db.run("INSERT INTO proyectos (grado, nombre, metodologia, escenario, temporalidad, problemática, pdas_seleccionados, fases_contenido) VALUES (?,?,?,?,?,?,?,?)", [grado, nombre, metodologia, escenario, temporalidad, problemática, pdaStr, fasesStr], () => resolve(true));
+  else db.run("INSERT INTO proyectos (grado, grupo_id, nombre, metodologia, escenario, temporalidad, problemática, pdas_seleccionados, fases_contenido) VALUES (?,?,?,?,?,?,?,?,?)", [grado, grupo_id, nombre, metodologia, escenario, temporalidad, problemática, pdaStr, fasesStr], () => resolve(true));
 }));
 ipcMain.handle('get-pdas', async () => new Promise((r, j) => {
   db.all(`
@@ -230,11 +295,11 @@ ipcMain.handle('get-pdas', async () => new Promise((r, j) => {
 }));
 
 // -- PLANEACION --
-ipcMain.handle('get-planeacion', async (e, g, s) => new Promise(r => db.get("SELECT * FROM planeacion WHERE grado=? AND semana=?", [g, s], (err, row) => r(row || {}))));
+ipcMain.handle('get-planeacion', async (e, grupo_id, s) => new Promise(r => db.get("SELECT * FROM planeacion WHERE grupo_id=? AND semana=?", [grupo_id, s], (err, row) => r(row || {}))));
 ipcMain.handle('save-planeacion', async (e, d) => new Promise(r => {
-  db.run("DELETE FROM planeacion WHERE grado=? AND semana=?", [d.grado, d.semana], () => {
-    db.run(`INSERT INTO planeacion (grado, semana, lunes_inicio, lunes_desarrollo, lunes_cierre, martes_inicio, martes_desarrollo, martes_cierre, miercoles_inicio, miercoles_desarrollo, miercoles_cierre, jueves_inicio, jueves_desarrollo, jueves_cierre, viernes_inicio, viernes_desarrollo, viernes_cierre, recursos, evaluacion, adecuaciones) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [d.grado, d.semana, d.lunes_inicio, d.lunes_desarrollo, d.lunes_cierre, d.martes_inicio, d.martes_desarrollo, d.martes_cierre, d.miercoles_inicio, d.miercoles_desarrollo, d.miercoles_cierre, d.jueves_inicio, d.jueves_desarrollo, d.jueves_cierre, d.viernes_inicio, d.viernes_desarrollo, d.viernes_cierre, d.recursos, d.evaluacion, d.adecuaciones], () => r(true));
+  db.run("DELETE FROM planeacion WHERE grupo_id=? AND semana=?", [d.grupo_id, d.semana], () => {
+    db.run(`INSERT INTO planeacion (grado, grupo_id, semana, lunes_inicio, lunes_desarrollo, lunes_cierre, martes_inicio, martes_desarrollo, martes_cierre, miercoles_inicio, miercoles_desarrollo, miercoles_cierre, jueves_inicio, jueves_desarrollo, jueves_cierre, viernes_inicio, viernes_desarrollo, viernes_cierre, recursos, evaluacion, adecuaciones) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [d.grado, d.grupo_id, d.semana, d.lunes_inicio, d.lunes_desarrollo, d.lunes_cierre, d.martes_inicio, d.martes_desarrollo, d.martes_cierre, d.miercoles_inicio, d.miercoles_desarrollo, d.miercoles_cierre, d.jueves_inicio, d.jueves_desarrollo, d.jueves_cierre, d.viernes_inicio, d.viernes_desarrollo, d.viernes_cierre, d.recursos, d.evaluacion, d.adecuaciones], () => r(true));
   });
 }));
 
