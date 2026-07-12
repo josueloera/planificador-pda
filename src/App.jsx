@@ -176,6 +176,7 @@ function App() {
     if (ipcRenderer) {
       ipcRenderer.invoke('get-license-status').then(res => {
         setLicenciaInfo(res);
+        window.openaiApiKey = res.openaiApiKey || '';
         setCargandoLicencia(false);
       });
       ipcRenderer.invoke('get-config').then(cfg => {
@@ -446,7 +447,10 @@ function App() {
   if (licenciaInfo && !licenciaInfo.isActivated && !licenciaInfo.isTrialValid) {
     return <Licencia onActivated={() => {
       // Recargar estado de licencia
-      ipcRenderer.invoke('get-license-status').then(res => setLicenciaInfo(res));
+      ipcRenderer.invoke('get-license-status').then(res => {
+        setLicenciaInfo(res);
+        window.openaiApiKey = res.openaiApiKey || '';
+      });
     }} />;
   }
 
@@ -535,7 +539,10 @@ function App() {
   if (vista === 'LICENCIA') {
       return <Licencia 
           onActivated={() => {
-              ipcRenderer.invoke('get-license-status').then(res => setLicenciaInfo(res));
+              ipcRenderer.invoke('get-license-status').then(res => {
+                  setLicenciaInfo(res);
+                  window.openaiApiKey = res.openaiApiKey || '';
+              });
               setVista('MENU');
               showToast("✅ ¡Licencia activada con éxito!");
           }} 
