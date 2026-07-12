@@ -10,13 +10,12 @@ import DashboardGrupos from './components/DashboardGrupos';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
-// --- CONFIGURACIÓN GLOBAL ---
-export const DEFAULT_FECHA_INICIO = new Date(2025, 7, 25); // 25 Agosto 2025
+export const DEFAULT_FECHA_INICIO = new Date(2026, 7, 31); // 31 Agosto 2026
 
 export const DEFAULT_PERIODOS = { 
-  1: { nombre: '1º Trimestre', inicio: '2025-08-26', fin: '2025-11-30' }, 
-  2: { nombre: '2º Trimestre', inicio: '2025-12-01', fin: '2026-03-20' }, 
-  3: { nombre: '3º Trimestre', inicio: '2026-03-21', fin: '2026-07-16' } 
+  1: { nombre: '1º Trimestre', inicio: '2026-08-31', fin: '2026-11-27' }, 
+  2: { nombre: '2º Trimestre', inicio: '2026-11-30', fin: '2027-03-19' }, 
+  3: { nombre: '3º Trimestre', inicio: '2027-03-20', fin: '2027-07-21' } 
 };
 
 const CAMPOS_FORMATIVOS = [
@@ -90,7 +89,7 @@ function App() {
   // ESTADOS
   const [alumnos, setAlumnos] = useState([]);
   const [grado, setGrado] = useState(() => localStorage.getItem('grado') ? parseInt(localStorage.getItem('grado')) : 3);
-  const [configCiclo, setConfigCiclo] = useState({ fechaInicioStr: '2025-08-25', periodos: DEFAULT_PERIODOS });
+  const [configCiclo, setConfigCiclo] = useState({ fechaInicioStr: '2026-08-31', periodos: DEFAULT_PERIODOS });
   
   // EVALUACIÓN
   const [criterios, setCriterios] = useState([]); 
@@ -470,7 +469,7 @@ function App() {
         <div className="menu-header-zone">
             <div className="menu-header-glow"></div>
             <h1 className="titulo-principal">PLANIFICADOR DOCENTE</h1>
-            <p className="menu-subtitle">Ciclo Escolar 2025 - 2026</p>
+            <p className="menu-subtitle">Ciclo Escolar 2026 - 2027</p>
             {licenciaInfo && licenciaInfo.isTrialValid && !licenciaInfo.isActivated && (
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '10px'}}>
                     <div style={{background: '#f39c12', color: 'white', padding: '5px 15px', borderRadius: '15px', fontSize: '0.9rem', fontWeight: 'bold'}}>
@@ -523,14 +522,14 @@ function App() {
           ipcRenderer.invoke('get-config').then(cfg => {
             if (cfg.fechaInicioStr || cfg.periodos) {
                 setConfigCiclo({
-                    fechaInicioStr: cfg.fechaInicioStr || '2025-08-25',
+                    fechaInicioStr: cfg.fechaInicioStr || '2026-08-31',
                     periodos: cfg.periodos ? JSON.parse(cfg.periodos) : DEFAULT_PERIODOS
                 });
             }
           });
       }} 
       currentConfig={configCiclo} 
-      defaultConfig={{fechaInicioStr: '2025-08-25', periodos: DEFAULT_PERIODOS}} />;
+      defaultConfig={{fechaInicioStr: '2026-08-31', periodos: DEFAULT_PERIODOS}} />;
   }
 
   if (vista === 'LICENCIA') {

@@ -77,6 +77,44 @@ db.serialize(() => {
   tablasMigrar.forEach(tabla => {
     db.run(`ALTER TABLE ${tabla} ADD COLUMN grupo_id INTEGER`, (err) => { /* Ignorar error si la columna ya existe */ });
   });
+
+  // Seeding para el nuevo ciclo escolar 2026-2027
+  db.get("SELECT valor FROM configuracion WHERE llave = 'fechaInicioStr'", (err, row) => {
+    if (!row || row.valor.startsWith('2025')) {
+      const defaultPeriodosStr = JSON.stringify({
+        1: { nombre: '1º Trimestre', inicio: '2026-08-31', fin: '2026-11-27' },
+        2: { nombre: '2º Trimestre', inicio: '2026-11-30', fin: '2027-03-19' },
+        3: { nombre: '3º Trimestre', inicio: '2027-03-20', fin: '2027-07-21' }
+      });
+      db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES ('fechaInicioStr', '2026-08-31')");
+      db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES ('periodos', ?)", [defaultPeriodosStr]);
+
+      // Sembrar eventos oficiales del ciclo 2026-2027
+      const defaultEventos = {
+        // CTE (Consejo Técnico Escolar)
+        "2026-08-24": "CTE", "2026-08-25": "CTE", "2026-08-26": "CTE", "2026-08-27": "CTE", "2026-08-28": "CTE",
+        "2026-09-25": "CTE", "2026-10-30": "CTE", "2026-11-27": "CTE", "2027-01-29": "CTE", "2027-02-26": "CTE",
+        "2027-04-30": "CTE", "2027-05-28": "CTE", "2027-06-25": "CTE",
+        // Suspensiones (Feriados)
+        "2026-09-16": "SUSPENSION", "2026-11-02": "SUSPENSION", "2026-11-16": "SUSPENSION", "2027-01-01": "SUSPENSION",
+        "2027-02-01": "SUSPENSION", "2027-03-15": "SUSPENSION", "2027-05-05": "SUSPENSION", "2027-05-15": "SUSPENSION",
+        // Vacaciones (Periodos Vacacionales)
+        "2026-12-21": "VACACIONES", "2026-12-22": "VACACIONES", "2026-12-23": "VACACIONES", "2026-12-24": "VACACIONES", "2026-12-25": "VACACIONES",
+        "2026-12-28": "VACACIONES", "2026-12-29": "VACACIONES", "2026-12-30": "VACACIONES", "2026-12-31": "VACACIONES",
+        "2027-01-04": "VACACIONES", "2027-01-05": "VACACIONES", "2027-01-06": "VACACIONES", "2027-01-07": "VACACIONES", "2027-01-08": "VACACIONES",
+        "2027-03-22": "VACACIONES", "2027-03-23": "VACACIONES", "2027-03-24": "VACACIONES", "2027-03-25": "VACACIONES", "2027-03-26": "VACACIONES",
+        "2027-03-29": "VACACIONES", "2027-03-30": "VACACIONES", "2027-03-31": "VACACIONES", "2027-04-01": "VACACIONES", "2027-04-02": "VACACIONES"
+      };
+
+      db.serialize(() => {
+        const stmt = db.prepare("INSERT OR REPLACE INTO eventos_oficiales (fecha, tipo) VALUES (?, ?)");
+        for (const [fecha, tipo] of Object.entries(defaultEventos)) {
+          stmt.run(fecha, tipo);
+        }
+        stmt.finalize();
+      });
+    }
+  });
 });
 
 function createWindow() {
