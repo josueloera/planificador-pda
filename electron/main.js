@@ -95,8 +95,12 @@ db.serialize(() => {
       });
       db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES ('fechaInicioStr', '2026-08-31')");
       db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES ('periodos', ?)", [defaultPeriodosStr]);
+    }
+  });
 
-      // Sembrar eventos oficiales del ciclo 2026-2027
+  // Sembrar eventos oficiales del ciclo 2026-2027 si aún no se ha hecho
+  db.get("SELECT valor FROM configuracion WHERE llave = 'seeded_2026_events_v3'", (err, row) => {
+    if (!row) {
       const defaultEventos = {
         // CTE (Consejo Técnico Escolar)
         "2026-08-24": "CTE", "2026-08-25": "CTE", "2026-08-26": "CTE", "2026-08-27": "CTE", "2026-08-28": "CTE",
@@ -114,12 +118,16 @@ db.serialize(() => {
       };
 
       db.serialize(() => {
+        // Limpiar tabla para borrar eventos erróneos (basura) anteriores
+        db.run("DELETE FROM eventos_oficiales");
         const stmt = db.prepare("INSERT OR REPLACE INTO eventos_oficiales (fecha, tipo) VALUES (?, ?)");
         for (const [fecha, tipo] of Object.entries(defaultEventos)) {
           stmt.run(fecha, tipo);
         }
         stmt.finalize();
       });
+
+      db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES ('seeded_2026_events_v3', 'true')");
     }
   });
 });
