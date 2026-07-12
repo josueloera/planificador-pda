@@ -146,6 +146,33 @@ const Licencia = ({ onActivated, onVolver }) => {
           ACTIVAR LICENCIA
         </button>
 
+        <button 
+          type="button"
+          onClick={() => {
+            ipcRenderer.invoke("open-license-file-dialog").then(res => {
+              if (res && res.licenseKey) {
+                setClave(res.licenseKey);
+                ipcRenderer.invoke("activate-license", res.licenseKey).then(K => {
+                  if (K.success) {
+                    onActivated();
+                  } else {
+                    setError(K.error || "Clave inválida.");
+                  }
+                });
+              }
+            });
+          }}
+          style={{
+            width: '100%', padding: '15px', background: '#3498db', color: 'white',
+            border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold',
+            cursor: 'pointer', marginBottom: '15px', transition: 'background 0.3s'
+          }}
+          onMouseOver={(e) => e.target.style.background = '#2980b9'}
+          onMouseOut={(e) => e.target.style.background = '#3498db'}
+        >
+          📁 CARGAR ARCHIVO DE LICENCIA
+        </button>
+
         {(!status?.isTrialValid && !status?.trialStartDate) && (
           <div>
             <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '20px 0' }} />
@@ -161,6 +188,9 @@ const Licencia = ({ onActivated, onVolver }) => {
             >
               Iniciar Prueba Gratuita de 7 Días
             </button>
+            <p style={{fontSize: "0.8rem", color: "#7f8c8d", marginTop: "8px", lineHeight: "1.4"}}>
+              *El periodo de prueba de 7 días no incluye las funciones de Inteligencia Artificial (ELARA). Al activar tu licencia con archivo permanente, tendrás acceso completo a todos los servicios y a la IA de ELARA.
+            </p>
           </div>
         )}
 

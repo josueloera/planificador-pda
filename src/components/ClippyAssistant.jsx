@@ -255,12 +255,12 @@ const ClippyAssistant = () => {
     if (!cleanText) return;
 
     // 1. Intentar usar la API oficial de TTS de OpenAI (Voz Nova de alta calidad)
-    if (MI_OPENAI_API_KEY) {
+    if (window.openaiApiKey || MI_OPENAI_API_KEY) {
       try {
         const response = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${MI_OPENAI_API_KEY}`,
+            'Authorization': `Bearer ${window.openaiApiKey || MI_OPENAI_API_KEY}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -513,7 +513,7 @@ Mantén siempre una personalidad inteligente, analítica, empática y de alta te
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${MI_OPENAI_API_KEY}`
+              'Authorization': `Bearer ${window.openaiApiKey || MI_OPENAI_API_KEY}`
             },
             body: JSON.stringify({
               model: 'gpt-4o-mini',
@@ -549,10 +549,10 @@ Mantén siempre una personalidad inteligente, analítica, empática y de alta te
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${MI_OPENAI_API_KEY}`
+                    'Authorization': `Bearer ${window.openaiApiKey || MI_OPENAI_API_KEY}`
                   },
                   body: JSON.stringify({
-                    model: 'dall-e-3',
+                    model: 'gpt-image-1',
                     prompt: prompt,
                     n: 1,
                     size: '1024x1024'
@@ -560,8 +560,8 @@ Mantén siempre una personalidad inteligente, analítica, empática y de alta te
                 });
                 if (dalleRes.ok) {
                   const dalleData = await dalleRes.json();
-                  const url = dalleData.data[0].url;
-                  toolResult = `Imagen generada exitosamente con la URL: ${url}`;
+                  const url = dalleData.data[0].url ? dalleData.data[0].url : "data:image/png;base64," + dalleData.data[0].b64_json;
+                  toolResult = `Imagen generada exitosamente`;
                   setMessages(prev => [...prev, { sender: 'bot', text: `¡Listo! He generado la imagen basada en tu descripción:`, imageUrl: url }]);
                 } else {
                   const errText = await dalleRes.text();
@@ -667,13 +667,21 @@ Mantén siempre una personalidad inteligente, analítica, empática y de alta te
     setMessages(prev => [...prev, { sender: 'user', text: userText }]);
     setIsTyping(true);
 
+    if (!window.openaiApiKey) {
+      await new Promise(r => setTimeout(r, 600));
+      setMessages(prev => [...prev, { sender: 'bot', text: "El periodo de prueba de 7 días no incluye funciones de Inteligencia Artificial (ELARA). Para activar todas las funciones y poner a ELARA en línea, por favor carga tu archivo de licencia permanente." }]);
+      setIsTyping(false);
+      return;
+    }
+
     try {
       let botResponse = null;
       let actedLocally = false;
       const lowerMsg = userText.toLowerCase();
 
       // 1. Intentar responder usando OpenAI si la clave está configurada
-      const hasOpenAI = MI_OPENAI_API_KEY && MI_OPENAI_API_KEY.startsWith('sk-');
+      const apiKey = window.openaiApiKey || MI_OPENAI_API_KEY;
+      const hasOpenAI = apiKey && apiKey.startsWith('sk-');
       if (hasOpenAI) {
         botResponse = await getOpenAIResponse(userText, currentChat);
       }
@@ -868,7 +876,13 @@ Mantén siempre una personalidad inteligente, analítica, empática y de alta te
                   src={msg.imageUrl} 
                   alt="Imagen generada" 
                   style={{ width: '100%', borderRadius: '12px', marginTop: '10px', display: 'block', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', cursor: 'pointer' }}
-                  onClick={() => window.open(msg.imageUrl)}
+                  onClick={() => {
+                    if (msg.imageUrl.startsWith("data:")) {
+                      ipcRenderer.invoke("open-base64-image", msg.imageUrl);
+                    } else {
+                      window.open(msg.imageUrl);
+                    }
+                  }}
                 />
               )}
             </div>

@@ -22,6 +22,11 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
       alert("Por favor, ingresa un tema o selecciona un PDA.");
       return;
     }
+
+    if (!window.openaiApiKey) {
+      alert("El periodo de prueba de 7 días no incluye funciones de Inteligencia Artificial. Para usar el Generador de Material Didáctico, activa tu licencia permanente.");
+      return;
+    }
     
     setGenerando(true);
     setResultado(null);
@@ -54,10 +59,10 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${MI_OPENAI_API_KEY}`
+          'Authorization': `Bearer ${window.openaiApiKey || MI_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
