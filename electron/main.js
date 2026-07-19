@@ -437,31 +437,36 @@ ipcMain.handle('save-multiple-events', async (e, eventosObj) => {
 ipcMain.handle('clear-evaluaciones-rango', async (e, f1, f2) => new Promise(r => db.run("DELETE FROM notas WHERE fecha >= ? AND fecha <= ?", [f1, f2], () => r(true))));
 ipcMain.handle('get-config', async () => new Promise(r => db.all("SELECT * FROM configuracion", [], (e, rows) => { const map = {}; (rows || []).forEach(x => map[x.llave] = x.valor); r(map); })));
 ipcMain.handle('save-config', async (e, llave, valor) => new Promise(r => db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES (?, ?)", [llave, valor], () => r(true))));
+
 ipcMain.handle('elara-speak', async (e, text) => {
-  return new Promise((resolve, reject) => {
-    const { exec } = require('child_process');
-    const cleanText = text.replace(/"/g, '\\"')
-                          .replace(/\n/g, ' ')
-                          .trim();
-                           
-    const outputDir = path.join(__dirname, '..', 'public');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-    const outputPath = path.join(outputDir, 'elara_voice.mp3');
-    
-    const edgeTtsPath = `C:\\Users\\USER\\.gemini\\antigravity\\scratch\\elara\\Backend\\.venv\\Scripts\\edge-tts.exe`;
-    const command = `"${edgeTtsPath}" --voice es-MX-DaliaNeural --rate "+5%" --text "${cleanText}" --write-media "${outputPath}"`;
-    
-    exec(command, { timeout: 10000 }, (error, stdout, stderr) => {
-      if (error) {
-        console.error("Error al generar audio de ELARA:", error);
-        reject(error);
-      } else {
-        resolve('/elara_voice.mp3?t=' + Date.now());
-      }
+    return new Promise((resolve, reject) => {
+      const { exec } = require('child_process');
+      const cleanText = text.replace(/"/g, '\\"')
+                            .replace(/\n/g, ' ')
+                            .trim();
+                             
+      const tempDir = app.getPath('temp');
+      const outputPath = path.join(tempDir, `elara_voice_${Date.now()}.mp3`);
+      
+      const edgeTtsPath = `C:\\Users\\USER\\.gemini\\antigravity\\scratch\\elara\\Backend\\.venv\\Scripts\\edge-tts.exe`;
+      const command = `"${edgeTtsPath}" --voice es-MX-DaliaNeural --rate "+5%" --text "${cleanText}" --write-media "${outputPath}"`;
+      
+      exec(command, { timeout: 10000 }, (error, stdout, stderr) => {
+        if (error) {
+          console.error("Error al generar audio de ELARA:", error);
+          reject(error);
+        } else {
+          try {
+            const buffer = fs.readFileSync(outputPath);
+            const base64 = buffer.toString('base64');
+            fs.unlinkSync(outputPath); // Clean up
+            resolve(`data:audio/mp3;base64,${base64}`);
+          } catch(err) {
+            reject(err);
+          }
+        }
+      });
     });
   });
-});
 
 ipcMain.handle('seed-database', async () => true);
