@@ -191,6 +191,10 @@ ipcMain.handle('get-license-status', () => {
   return licenseManager.getLicenseStatus();
 });
 
+ipcMain.handle('get-license-proof', () => {
+  return licenseManager.getLicenseProof();
+});
+
 ipcMain.handle('activate-license', (event, key) => {
   return licenseManager.activateLicense(key);
 });

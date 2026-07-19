@@ -77,12 +77,24 @@ const ClippyAssistant = () => {
   
   useEffect(() => {
     const sessionId = 'planner-' + Math.random().toString(36).substring(7);
-    const wsUrl = `ws://34.50.189.82:8000/api/v1/chat/ws/${sessionId}?token=ELARA-personal-key-2026&device=PLANNER`;
-    
     let isConnected = false;
+    let ws = null;
 
-    const connectWS = () => {
-      const ws = new WebSocket(wsUrl);
+    const connectWS = async () => {
+      let token = 'ELARA-personal-key-2026';
+      if (ipcRenderer) {
+        try {
+          const proof = await ipcRenderer.invoke('get-license-proof');
+          if (proof && proof.licenseKey) {
+            token = proof.licenseKey;
+          }
+        } catch (e) {
+          console.error("Error fetching license proof for WS:", e);
+        }
+      }
+
+      const wsUrl = `ws://34.50.189.82:8000/api/v1/chat/ws/${sessionId}?token=${token}&device=PLANNER`;
+      ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
