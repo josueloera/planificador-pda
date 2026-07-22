@@ -1,40 +1,40 @@
 export const getLocalResponse = (message) => {
   const lowerMsg = message.toLowerCase();
   
-  if (lowerMsg.includes('hola') || lowerMsg.includes('saludos')) {
-    return "¡Hola, maestro! Soy tu Asistente Inteligente. Estoy aquí para ayudarte con tus planeaciones y dudas sobre la NEM. Si ingresas tu Clave API de ChatGPT en la configuración, ¡podré crear proyectos completos para ti!";
+  if (lowerMsg.includes('hola') || lowerMsg.includes('saludos') || lowerMsg.includes('elara')) {
+    return "¡Saludos, docente! Soy ELARA, tu Asistente Pedagógica de la NEM. Estoy configurada de manera privada en tu equipo para asistirte en planeaciones, evaluación formativa y dosificación curricular. ¿En qué te puedo apoyar hoy?";
   }
   
-  if (lowerMsg.includes('nem') || lowerMsg.includes('nueva escuela mexicana')) {
-    return "La Nueva Escuela Mexicana (NEM) busca una educación humanista, inclusiva y con equidad. Se basa en 4 campos formativos y 7 ejes articuladores. ¿En qué campo te gustaría enfocar tu proyecto?";
+  if (lowerMsg.includes('privad') || lowerMsg.includes('usuario') || lowerMsg.includes('homolog') || lowerMsg.includes('segurid')) {
+    return "Tu información de planeación, alumnos y registros escolares es 100% privada y almacenada localmente en tu base de datos SQLite aislada en este equipo. Tu cuenta no mezcla datos con otros usuarios.";
   }
   
   if (lowerMsg.includes('pda') || lowerMsg.includes('proceso de desarrollo')) {
-    return "Los Procesos de Desarrollo de Aprendizaje (PDA) son las metas que los alumnos deben alcanzar. En la pestaña 'Cargar Todo' puedes ver los PDAs filtrados por grado y campo formativo automáticamente.";
+    return "Los Procesos de Desarrollo de Aprendizaje (PDA) de la SEP para tu grado están cargados y listos en la base de datos local. Puedes seleccionarlos en tus planeaciones y proyectos.";
   }
   
-  if (lowerMsg.includes('proyecto') || lowerMsg.includes('planeacion')) {
-    return "Para crear un proyecto, ve a la sección de 'Planeación'. Te sugiero usar la metodología de Aprendizaje Basado en Proyectos Comunitarios o STEM según tu campo formativo.";
+  if (lowerMsg.includes('proyecto') || lowerMsg.includes('planeacion') || lowerMsg.includes('llena')) {
+    return "Puedo redactar y estructurar tus planeaciones semanales y completar las fases de tus proyectos didácticos NEM. Escribe 'llena la planeacion' o 'llena el proyecto abierto' para ejecutar la redacción automatizada.";
   }
 
   if (lowerMsg.includes('evaluacion') || lowerMsg.includes('calificar')) {
-    return "La evaluación formativa es clave en la NEM. Te recomiendo diseñar rúbricas o listas de cotejo basadas en los PDA que seleccionaste en tu planeación.";
+    return "La evaluación formativa de la NEM está integrada en tus grupos. Puedo ayudarte a diseñar criterios y ponderaciones para calcular los promedios diarios.";
   }
 
-  if (lowerMsg.includes('api') || lowerMsg.includes('chatgpt')) {
-    return "Para desbloquear todo mi poder inteligente, haz clic en el botón del engranaje (⚙️) aquí en el chat, pega tu 'API Key' de OpenAI y gárdala. Así podré redactarte textos originales, proyectos enteros y exámenes.";
+  if (lowerMsg.includes('api') || lowerMsg.includes('chatgpt') || lowerMsg.includes('key')) {
+    return "Para habilitar mi generación autónoma e inferencia avanzada de OpenAI, por favor introduce tu API Key en la pantalla de Licencia o Configuración.";
   }
 
-  return "Esa es una excelente pregunta. En mi versión gratuita puedo guiarte sobre el uso de este programa y conceptos de la NEM. Para que te redacte sugerencias y hojas de trabajo, por favor configura tu API Key de OpenAI (ChatGPT) en el icono del engranaje (⚙️).";
+  return "Entendido. Procesando instrucción didáctica. Como tu Asistente Pedagógica privada, puedo redactar planeaciones semanales, organizar materiales didácticos y gestionar la evaluación formativa de tus alumnos.";
 };
 
 export const getRandomTip = () => {
   const tips = [
-    "💡 Tip: Puedes arrastrar y soltar tus planeaciones para cambiar su orden.",
-    "💡 Tip: Agrega actividades de inicio, desarrollo y cierre para una mejor estructura.",
-    "💡 Tip: No olvides conectar tus proyectos con los Ejes Articuladores de la NEM.",
-    "💡 Tip: Si conectas tu API de ChatGPT, puedo redactarte rubricas de evaluación automáticas.",
-    "💡 Tip: Selecciona cuidadosamente los PDA para no saturar tu proyecto."
+    "💡 ELARA: Recuerda que puedes cambiar el Grado de Primaria (1º a 6º) directamente en la barra superior de Planeación.",
+    "📋 ELARA: Si deseas completar tu planeación semanal de Lunes a Viernes de inmediato, pídemelo en el chat diciéndome 'llena la planeacion'.",
+    "📚 ELARA: Tus planeaciones y proyectos se guardan localmente de forma privada en tu base de datos SQLite.",
+    "🧬 ELARA: Motor pedagógico listo para apoyarte con los aprendizajes PDA de la Nueva Escuela Mexicana (NEM).",
+    "🖨️ ELARA: Puedes imprimir o guardar en PDF tu planeación completa con formato oficial de la SEP desde el botón de impresora."
   ];
   return tips[Math.floor(Math.random() * tips.length)];
 };

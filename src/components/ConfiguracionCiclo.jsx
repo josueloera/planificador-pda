@@ -32,7 +32,10 @@ const ConfiguracionCiclo = ({ onVolver, currentConfig, defaultConfig }) => {
         try {
             await ipcRenderer.invoke('save-config', 'fechaInicioStr', config.fechaInicioStr);
             await ipcRenderer.invoke('save-config', 'periodos', JSON.stringify(config.periodos));
-            alert('Configuración guardada correctamente.');
+            await ipcRenderer.invoke('save-config', 'nombreDocente', config.nombreDocente || '');
+            await ipcRenderer.invoke('save-config', 'nombreEscuela', config.nombreEscuela || '');
+            await ipcRenderer.invoke('save-config', 'cct', config.cct || '');
+            alert('Configuración e Identidad Docente guardadas correctamente.');
         } catch (error) {
             console.error(error);
             alert('Error al guardar la configuración.');
@@ -51,12 +54,6 @@ const ConfiguracionCiclo = ({ onVolver, currentConfig, defaultConfig }) => {
     const handleUploadCalendar = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        if (!window.openaiApiKey) {
-            alert("El periodo de prueba de 7 días no incluye funciones de Inteligencia Artificial. Para usar la Extracción Mágica de Calendario, activa tu licencia permanente.");
-            e.target.value = null;
-            return;
-        }
 
         setLoadingAI(true);
         setStatusAI('Analizando imagen con IA...');
@@ -92,7 +89,7 @@ Instrucciones:
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${window.openaiApiKey || MI_OPENAI_API_KEY}`
+                    'Authorization': `Bearer ${MI_OPENAI_API_KEY}`
                 },
                 body: JSON.stringify({
                     model: 'gpt-4o',
@@ -121,6 +118,7 @@ Instrucciones:
 
             setStatusAI('Guardando datos en la base de datos...');
 
+            // 1. Update config UI
             const newConfig = {
                 fechaInicioStr: parsedData.fecha_inicio || config.fechaInicioStr,
                 periodos: {
@@ -131,10 +129,12 @@ Instrucciones:
             };
             setConfig(newConfig);
 
+            // 2. Save config to DB
             if (ipcRenderer) {
                 await ipcRenderer.invoke('save-config', 'fechaInicioStr', newConfig.fechaInicioStr);
                 await ipcRenderer.invoke('save-config', 'periodos', JSON.stringify(newConfig.periodos));
 
+                // 3. Save Events
                 if (parsedData.eventos && parsedData.eventos.length > 0) {
                     const eventosMap = {};
                     parsedData.eventos.forEach(ev => {
@@ -144,30 +144,66 @@ Instrucciones:
                 }
             }
 
-            alert('Calendario procesado e importado con éxito.');
+            alert('¡Calendario analizado y guardado con éxito!');
         } catch (error) {
             console.error(error);
-            alert('Error al procesar el calendario con IA: ' + error.message);
+            alert('Ocurrió un error al analizar la imagen. Intenta ajustando las fechas manualmente.');
         } finally {
             setLoadingAI(false);
             setStatusAI('');
-            e.target.value = null;
+            e.target.value = null; // reset input
         }
     };
 
     return (
         <div className="pantalla-dosificador" style={{ padding: '30px', overflowY: 'auto' }}>
-            <div className="header-dosificador" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div className="header-dosificador">
                 <h2>⚙️ Configuración del Ciclo Escolar</h2>
-                <button className="btn-volver" onClick={onVolver} style={{ padding: '10px 20px', background: '#34495e', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Volver al Menú</button>
+                <button className="btn-volver" onClick={onVolver}>Volver al Menú</button>
             </div>
 
             <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+                {/* PANEL MANUAL */}
                 <div style={{ flex: 1, minWidth: '350px', background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
-                    <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '10px', marginBottom: '20px' }}>Ajuste Manual</h3>
+                    <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '10px', marginBottom: '20px' }}>
+                        Ajuste Manual
+                    </h3>
                     
                     <div style={{ marginBottom: '20px' }}>
-                        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#34495e' }}>Fecha de Inicio de Clases</label>
+                        <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px', color: '#34495e' }}>👤 Nombre del Docente</label>
+                        <input 
+                            type="text" 
+                            value={config.nombreDocente || ''} 
+                            onChange={(e) => handleChangeFecha('nombreDocente', e.target.value)}
+                            placeholder="Ej: Prof. Roberto Martínez"
+                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bdc3c7' }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px', color: '#34495e' }}>🏫 Nombre de la Escuela</label>
+                        <input 
+                            type="text" 
+                            value={config.nombreEscuela || ''} 
+                            onChange={(e) => handleChangeFecha('nombreEscuela', e.target.value)}
+                            placeholder="Ej: Escuela Primaria Benito Juárez"
+                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bdc3c7' }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px', color: '#34495e' }}>📜 Clave de Centro de Trabajo (CCT)</label>
+                        <input 
+                            type="text" 
+                            value={config.cct || ''} 
+                            onChange={(e) => handleChangeFecha('cct', e.target.value)}
+                            placeholder="Ej: 15EPR0123X"
+                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bdc3c7' }}
+                        />
+                    </div>
+
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#34495e' }}>Fecha de Inicio de Clases</label>
                         <input 
                             type="date" 
                             value={config.fechaInicioStr} 
@@ -199,62 +235,39 @@ Instrucciones:
                     </button>
                 </div>
 
+                {/* PANEL IA */}
                 <div style={{ flex: 1, minWidth: '350px', background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{ color: '#8e44ad', borderBottom: '2px solid #e8daef', paddingBottom: '10px', marginBottom: '20px' }}>✨ Extracción Mágica (IA)</h3>
+                    <h3 style={{ color: '#8e44ad', borderBottom: '2px solid #e8daef', paddingBottom: '10px', marginBottom: '20px' }}>
+                        ✨ Extracción Mágica (IA)
+                    </h3>
+                    <p style={{ color: '#555', lineHeight: '1.6', marginBottom: '20px' }}>
+                        ¡Olvídate de configurar las fechas manualmente! Sube una imagen clara del <b>Calendario Oficial de la SEP</b> y nuestra Inteligencia Artificial leerá los días de CTE, Vacaciones, Descargas y ajustará los trimestres por ti.
+                    </p>
+
                     <div style={{ border: '2px dashed #bdc3c7', borderRadius: '10px', padding: '40px', textAlign: 'center', background: 'white', position: 'relative', cursor: loadingAI ? 'not-allowed' : 'pointer' }}>
                         {loadingAI ? (
                             <div style={{ color: '#2980b9' }}>
-                                <div style={{ fontSize: '2rem' }}>⏳</div>
+                                <div style={{ fontSize: '2rem', animation: 'spin 2s linear infinite' }}>⏳</div>
                                 <p style={{ fontWeight: 'bold', marginTop: '15px' }}>{statusAI}</p>
                             </div>
                         ) : (
                             <>
                                 <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📸</div>
                                 <p style={{ color: '#7f8c8d', margin: 0 }}>Haz clic para seleccionar o toma una foto del calendario</p>
-                                <input type="file" accept="image/*" onChange={handleUploadCalendar} disabled={loadingAI} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleUploadCalendar}
+                                    disabled={loadingAI}
+                                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                />
                             </>
                         )}
                     </div>
+                    
                     <div style={{ marginTop: 'auto', paddingTop: '20px', background: '#fff3cd', padding: '15px', borderRadius: '8px', color: '#856404', fontSize: '0.85rem' }}>
                         <b>Nota:</b> La IA hace su mejor esfuerzo para interpretar el calendario, pero te recomendamos revisar los resultados en el <i>Calendario SEP</i> y ajustar los trimestres manualmente si es necesario.
                     </div>
-                </div>
-
-                <div style={{ flex: 1, minWidth: '350px', background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{ color: '#2980b9', borderBottom: '2px solid #ecf0f1', paddingBottom: '10px', marginBottom: '20px' }}>🔑 Licencia y API Key</h3>
-                    <p style={{ color: '#555', lineHeight: '1.6', marginBottom: '20px' }}>
-                        <b>Estado de API Key:</b> {window.openaiApiKey ? "Activada con OpenAI API Key (Listo)" : "No detectada (Modo Libre)"}
-                    </p>
-                    <button 
-                        onClick={() => {
-                            if (confirm("¿Seguro que deseas desactivar la licencia de este equipo?")) {
-                                ipcRenderer.invoke('deactivate-license-api').then(() => {
-                                    alert("Licencia desactivada. Reiniciando...");
-                                    window.location.reload();
-                                });
-                            }
-                        }}
-                        style={{ width: '100%', padding: '12px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', marginBottom: '15px' }}>
-                        Desactivar Licencia
-                    </button>
-                    <button 
-                        onClick={() => {
-                            ipcRenderer.invoke('open-license-file-dialog').then(res => {
-                                if (res && res.licenseKey) {
-                                    ipcRenderer.invoke('activate-license', res.licenseKey).then(K => {
-                                        if (K.success) {
-                                            alert("¡Nueva licencia cargada con éxito!");
-                                            window.location.reload();
-                                        } else {
-                                            alert(K.error || "Clave inválida.");
-                                        }
-                                    });
-                                }
-                            });
-                        }}
-                        style={{ width: '100%', padding: '12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
-                        📁 Cargar Archivo de Licencia
-                    </button>
                 </div>
             </div>
         </div>

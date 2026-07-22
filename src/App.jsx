@@ -340,30 +340,32 @@ function App() {
   const generarReporteTrimestral = () => {
       if (!ipcRenderer || alumnos.length === 0) return;
       setCargandoReporte(true);
-      const periodo = configCiclo.periodos[trimestre];
+      const periodo = configCiclo.periodos[trimestre] || { inicio: '2026-08-31', fin: '2026-11-27' };
       if(ipcRenderer) {
           Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin) ]).then(([todosCriterios, todasNotas]) => {
           const reporte = alumnos.map(alumno => {
               const fila = { id: alumno.id, nombre: alumno.nombre };
               const criteriosAsignatura = todosCriterios || [];
               const idsCriterios = criteriosAsignatura.map(c => c.id);
-              const notasAlumno = (todasNotas || []).filter(n => n.alumno_id === alumno.id);
-              const notasValidas = notasAlumno.filter(n => idsCriterios.includes(n.criterio_id));
-              const fechasUnicas = [...new Set(notasValidas.map(n => n.fecha))];
+              const notasAlumno = (todasNotas || []).filter(n => n.alumno_id === alumno.id && idsCriterios.includes(n.criterio_id));
+              const fechasUnicas = [...new Set(notasAlumno.map(n => n.fecha))];
               
               let sumaPromediosDiarios = 0; let diasTrabajados = 0;
               fechasUnicas.forEach(fecha => {
-                  let sumaPonderadaDia = 0; let diaConNotas = false;
+                  let sumaWeightedDia = 0;
+                  let totalPorcentajeDia = 0;
                   criteriosAsignatura.forEach(c => {
-                      const n = notasValidas.find(x => x.fecha === fecha && x.criterio_id === c.id);
+                      const n = notasAlumno.find(x => x.fecha === fecha && x.criterio_id === c.id);
                       const val = n ? parseFloat(n.valor) : NaN;
-                      if (!isNaN(val)) {
-                          sumaPonderadaDia += val;
-                          diaConNotas = true;
+                      const peso = parseFloat(c.porcentaje) || 0;
+                      if (!isNaN(val) && peso > 0) {
+                          sumaWeightedDia += val * peso;
+                          totalPorcentajeDia += peso;
                       }
                   });
-                  if(diaConNotas) {
-                      sumaPromediosDiarios += (sumaPonderadaDia / 10);
+                  if(totalPorcentajeDia > 0) {
+                      const promDia = sumaWeightedDia / totalPorcentajeDia;
+                      sumaPromediosDiarios += promDia;
                       diasTrabajados++;
                   }
               });
@@ -387,6 +389,26 @@ function App() {
       setModoEdicionProy(true); 
   };
   const guardarProyecto = () => { if(!proyectoActual.nombre) return showToast("Falta nombre"); const proy = { ...proyectoActual, id: (typeof proyectoActual.id === 'string' && proyectoActual.id.startsWith('sug-')) ? null : proyectoActual.id, grado, grupo_id: grupoActual?.id }; ipcRenderer.invoke('save-proyecto', proy).then(()=>{ showToast("✅ Proyecto guardado"); setModoEdicionProy(false); setVista('MENU'); setTimeout(() => setVista('PROYECTOS'), 50); }); };
+  const guardarProyectoSilencioso = (proyectoData) => {
+    const target = proyectoData || proyectoActual;
+    if (!target || !target.nombre) return Promise.resolve(false);
+    const proy = {
+      ...target,
+      id: (typeof target.id === 'string' && target.id.startsWith('sug-')) ? null : target.id,
+      grado,
+      grupo_id: grupoActual?.id
+    };
+    if (ipcRenderer) {
+      return ipcRenderer.invoke('save-proyecto', proy).then(() => {
+        showToast("✅ Proyecto guardado");
+        return true;
+      }).catch(err => {
+        console.error("Error al guardar proyecto:", err);
+        return false;
+      });
+    }
+    return Promise.resolve(false);
+  };
   const togglePdaProyecto = (id) => { const s = Array.isArray(proyectoActual.pdas_seleccionados) ? proyectoActual.pdas_seleccionados : []; const n = s.includes(id) ? s.filter(x => x !== id) : [...s, id]; setProyectoActual({...proyectoActual, pdas_seleccionados: n}); };
   const calcularColorSemaforo = (p) => { const f = Object.values(safeParse(p.fases_contenido, {})); const l = f.filter(x => x && x.length > 5).length; if (l === 0) return '#ffebee'; if (l < 4) return '#fff9c4'; return '#e8f5e9'; };
   const actualizarDatoProyecto = (campo, valor) => { setProyectoActual(prev => ({ ...prev, [campo]: valor })); };
@@ -440,29 +462,28 @@ function App() {
   };
 
   const calcularPromedioDiario = (alumnoId) => {
-      let sumaTotal = 0; let tieneNotas = false;
+      if (!criterios || criterios.length === 0) return null;
+      let sumaWeighted = 0;
+      let totalPorcentaje = 0;
       criterios.forEach(c => {
-          if(!c.id) return;
           const val = parseFloat(notas[`${alumnoId}-${c.id}`]);
-          if (!isNaN(val)) {
-              sumaTotal += val;
-              tieneNotas = true;
+          const peso = parseFloat(c.porcentaje) || 0;
+          if (!isNaN(val) && peso > 0) {
+              sumaWeighted += val * peso;
+              totalPorcentaje += peso;
           }
       });
-      return tieneNotas ? sumaTotal.toFixed(1) : '-';
+      if (totalPorcentaje === 0) return null;
+      return (sumaWeighted / totalPorcentaje).toFixed(1);
   };
   
-  const getColorSemaforo = (promedio, escala10 = false) => { 
+  const getColorSemaforo = (promedio) => { 
+      if (promedio === null || promedio === undefined || promedio === '' || promedio === '-') return 'transparent';
       const p = parseFloat(promedio); 
-      if(isNaN(p)) return 'white'; 
-      if (escala10) {
-          if(p < 6.0) return '#ffcdd2'; 
-          if(p < 9.0) return '#fff9c4'; 
-          return '#c8e6c9'; 
-      }
-      if(p < 60.0) return '#ffcdd2'; 
-      if(p < 90.0) return '#fff9c4'; 
-      return '#c8e6c9'; 
+      if (isNaN(p)) return 'transparent'; 
+      if (p < 6.0) return '#ffcdd2'; // Rojo (5 a 6)
+      if (p < 9.0) return '#fff9c4'; // Amarillo (6 a 9)
+      return '#c8e6c9';             // Verde (9 a 10)
   };
 
   // ================= RENDERIZADO =================
@@ -659,7 +680,7 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
   }
 
   // Resto de vistas (Bitácora, Dosif, etc.)
-  if(vista === 'PLANNER') { const isVisto = (vistos.plan || []).includes(String(semanaPlan)); return ( <div className="pantalla-dosificador"> <div className="header-dosificador no-print"> <div style={{display:'flex', gap:10}}><h2>Planeación</h2><select value={semanaPlan} onChange={e=>setSemanaPlan(Number(e.target.value))}>{SEMANAS_CLASE.map(s=><option key={s.id} value={s.id}>Sem {s.id} ({obtenerFechasSemana(s.id)})</option>)}</select></div> <div><button onClick={()=>toggleVisto('plan', semanaPlan)} style={{padding: '10px 15px', fontWeight:'bold', cursor: 'pointer', background: isVisto ? '#2ecc71' : '#bdc3c7', color: 'white', border: 'none', borderRadius: 5, marginRight: 10}} className="no-print"> {isVisto ? '✅ Completada' : 'Marcar Completada'} </button><button className="btn-guardar" onClick={savePlan}>💾 Guardar</button><button className="btn-volver" onClick={()=>window.print()}>🖨️</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div> </div> <div className="hoja-planeacion" style={{opacity: isVisto ? 0.8 : 1}}> <div className="seccion-plan" style={{marginBottom:20}}> <h3>🎯 Aprendizajes (PDA)</h3> {pdasSemana.length === 0 ? <p style={{color:'#999'}}>Sin contenido.</p> : <ul>{pdasSemana.map((p,i)=><li key={i}><b>{p.proyecto}</b>: {p.pda}</li>)}</ul>} </div> <div className="grid-semanal">{['lunes','martes','miercoles','jueves','viernes'].map(d=>(<div key={d} className="dia-plan"><div className="titulo-dia">{d.toUpperCase()}</div><textarea placeholder="Inicio" value={planData[`${d}_inicio`]} onChange={e=>setPlanData({...planData,[`${d}_inicio`]:e.target.value})} /><textarea placeholder="Desarrollo" style={{height:100}} value={planData[`${d}_desarrollo`]} onChange={e=>setPlanData({...planData,[`${d}_desarrollo`]:e.target.value})} /><textarea placeholder="Cierre" value={planData[`${d}_cierre`]} onChange={e=>setPlanData({...planData,[`${d}_cierre`]:e.target.value})} /></div>))}</div> <div className="footer-plan"><div className="caja-footer"><h4>Recursos</h4><textarea value={planData.recursos} onChange={e=>setPlanData({...planData,recursos:e.target.value})}/></div><div className="caja-footer"><h4>Evaluación</h4><textarea value={planData.evaluacion} onChange={e=>setPlanData({...planData,evaluacion:e.target.value})}/></div><div className="caja-footer"><h4>Adecuaciones</h4><textarea value={planData.adecuaciones} onChange={e=>setPlanData({...planData,adecuaciones:e.target.value})}/></div></div> </div> </div> ); }
+  if(vista === 'PLANNER') { const isVisto = (vistos.plan || []).includes(String(semanaPlan)); return ( <div className="pantalla-dosificador"> <div className="header-dosificador no-print"> <div style={{display:'flex', gap:10}}><h2>Planeación</h2><select value={semanaPlan} onChange={e=>setSemanaPlan(Number(e.target.value))}>{SEMANAS_CLASE.map(s=><option key={s.id} value={s.id}>Sem {s.id} ({obtenerFechasSemana(s.id)})</option>)}</select></div> <div><button onClick={()=>toggleVisto('plan', semanaPlan)} style={{padding: '10px 15px', fontWeight:'bold', cursor: 'pointer', background: isVisto ? '#2ecc71' : '#bdc3c7', color: 'white', border: 'none', borderRadius: 5, marginRight: 10}} className="no-print"> {isVisto ? '✅ Completada' : 'Marcar Completada'} </button><button className="btn-guardar" onClick={savePlan}>💾 Guardar</button><button className="btn-volver" onClick={()=>window.print()}>🖨️</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div> </div> <div className="hoja-planeacion" style={{opacity: isVisto ? 0.8 : 1}}> <div className="seccion-plan" style={{marginBottom:20}}> <h3>🎯 Aprendizajes (PDA)</h3> {pdasSemana.length === 0 ? <p style={{color:'#999'}}>Sin contenido.</p> : <ul>{pdasSemana.map((p,i)=><li key={i}><b>{p.proyecto}</b>: {p.pda}</li>)}</ul>} </div> <div className="grid-semanal">{['lunes','martes','miercoles','jueves','viernes'].map(d=>(<div key={d} className="dia-plan"><div className="titulo-dia">{d.toUpperCase()}</div><textarea placeholder="Inicio" style={{height:80}} value={planData[`${d}_inicio`]} onChange={e=>setPlanData({...planData,[`${d}_inicio`]:e.target.value})} /><textarea placeholder="Desarrollo" style={{height:150}} value={planData[`${d}_desarrollo`]} onChange={e=>setPlanData({...planData,[`${d}_desarrollo`]:e.target.value})} /><textarea placeholder="Cierre" style={{height:80}} value={planData[`${d}_cierre`]} onChange={e=>setPlanData({...planData,[`${d}_cierre`]:e.target.value})} /></div>))}</div> <div className="footer-plan"><div className="caja-footer"><h4>Recursos</h4><textarea value={planData.recursos} onChange={e=>setPlanData({...planData,recursos:e.target.value})}/></div><div className="caja-footer"><h4>Evaluación</h4><textarea value={planData.evaluacion} onChange={e=>setPlanData({...planData,evaluacion:e.target.value})}/></div><div className="caja-footer"><h4>Adecuaciones</h4><textarea value={planData.adecuaciones} onChange={e=>setPlanData({...planData,adecuaciones:e.target.value})}/></div></div> </div> </div> ); }
   if(vista === 'GRUPO') return (<div className="pantalla-dosificador"><div className="header-dosificador"><h2>👥 Mi Grupo ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><button className="btn-volver" onClick={()=>setVista('MENU')}>Volver</button></div><div className="config-grid"><div className="columna-gestion"><h3>📋 Pegar Lista</h3><textarea value={textoPegado} onChange={e=>setTextoPegado(e.target.value)} style={{width:'95%', height:200}}/><button className="btn-guardar" onClick={procesarListaAlumnos}>{procesando?'...':'Agregar'}</button></div><div className="columna-gestion"><h3>🎓 Alumnos</h3><ul>{alumnos.map(a=><li key={a.id}>{a.nombre} <button onClick={()=>borrarAlumno(a.id)}>🗑️</button></li>)}</ul></div></div></div>);
   if(vista === 'COMISIONES') return ( <div className="pantalla-dosificador"> <div className="header-dosificador"> <h2>🔔 Comisiones</h2> <button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button> </div> <div className="config-grid"> <div className="columna-gestion"> <h3>Nueva</h3> <input value={nuevaComision.descripcion} onChange={e=>setNuevaComision({...nuevaComision, descripcion:e.target.value})} placeholder="Descripción"/> <input type="date" value={nuevaComision.fecha} onChange={e=>setNuevaComision({...nuevaComision, fecha:e.target.value})}/> <button className="btn-guardar" onClick={()=>{ipcRenderer.invoke('add-comision', nuevaComision).then(()=>{ipcRenderer.invoke('get-comisiones').then(setComisiones); alert('Agregada')})}}>Guardar</button> </div> <div className="columna-gestion"> <h3>Lista</h3> {comisiones.map(c=><div key={c.id}><b>{c.fecha}</b>: {c.descripcion}</div>)} </div> </div> </div> );
   if(vista === 'CALENDARIO') return (<div className="pantalla-dosificador"><div className="header-dosificador"><div><button onClick={mesAnterior}>◀</button> <h2 style={{color:'black'}}>{NOMBRES_MESES[mesCal]} {anioCal}</h2> <button onClick={mesSiguiente}>▶</button></div><div><button onClick={()=>setModoConfigCalendario(!modoConfigCalendario)} style={{background: modoConfigCalendario ? '#e67e22' : '#3498db', color: 'white', marginRight:10, padding: '10px'}}>{modoConfigCalendario ? '✅ Terminar' : '⚙️ Configurar SEP'}</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div></div>{modoConfigCalendario && (<div style={{background:'white', padding:15, marginBottom:15, borderRadius:8, boxShadow:'0 2px 5px rgba(0,0,0,0.1)', display:'flex', gap:10, flexWrap:'wrap'}}>{Object.keys(TIPOS_EVENTO).map(k=>(<button key={k} onClick={()=>setHerramientaSeleccionada(k)} style={{background: TIPOS_EVENTO[k].color, color: TIPOS_EVENTO[k].texto, border: herramientaSeleccionada===k ? '3px solid black' : '1px solid #ccc', padding: '8px 15px', fontWeight: 'bold', cursor: 'pointer'}}>{TIPOS_EVENTO[k].label}</button>))}</div>)}<div className="grid-calendario-header"><div>DOM</div><div>LUN</div><div>MAR</div><div>MIE</div><div>JUE</div><div>VIE</div><div>SAB</div></div><div className="grid-calendario-dias">{renderCal()}</div></div>);
