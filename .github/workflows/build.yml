@@ -29,6 +29,9 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSC_IDENTITY_AUTO_DISCOVERY: false
+        VITE_GEMINI_API_KEY: "AQ.Ab8RN6JdsxRRq1F9STsd8RPV6Z-Ri2EYdPAhgYJG5VmRcRCQZw"
+        GEMINI_API_KEY: "AQ.Ab8RN6JdsxRRq1F9STsd8RPV6Z-Ri2EYdPAhgYJG5VmRcRCQZw"
+        VITE_GEMINI_MODEL: "gemini-2.0-flash"
 
     - name: Upload Mac Installer to GitHub Releases
       uses: softprops/action-gh-release@v2
@@ -60,6 +63,9 @@ jobs:
       run: npm run dist -- --win
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VITE_GEMINI_API_KEY: "AQ.Ab8RN6JdsxRRq1F9STsd8RPV6Z-Ri2EYdPAhgYJG5VmRcRCQZw"
+        GEMINI_API_KEY: "AQ.Ab8RN6JdsxRRq1F9STsd8RPV6Z-Ri2EYdPAhgYJG5VmRcRCQZw"
+        VITE_GEMINI_MODEL: "gemini-2.0-flash"
 
     - name: Upload Windows Installer to GitHub Releases
       uses: softprops/action-gh-release@v2
