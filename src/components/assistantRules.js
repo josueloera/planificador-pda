@@ -21,8 +21,8 @@ export const getLocalResponse = (message) => {
     return "La evaluación formativa de la NEM está integrada en tus grupos. Puedo ayudarte a diseñar criterios y ponderaciones para calcular los promedios diarios.";
   }
 
-  if (lowerMsg.includes('api') || lowerMsg.includes('chatgpt') || lowerMsg.includes('key')) {
-    return "Para habilitar mi generación autónoma e inferencia avanzada de OpenAI, por favor introduce tu API Key en la pantalla de Licencia o Configuración.";
+  if (lowerMsg.includes('api') || lowerMsg.includes('gemini') || lowerMsg.includes('key')) {
+    return "Para habilitar mi generación autónoma con Gemini, configura tu API Key en el archivo .env del proyecto (VITE_GEMINI_API_KEY o GEMINI_API_KEY).";
   }
 
   return "Entendido. Procesando instrucción didáctica. Como tu Asistente Pedagógica privada, puedo redactar planeaciones semanales, organizar materiales didácticos y gestionar la evaluación formativa de tus alumnos.";
@@ -30,7 +30,7 @@ export const getLocalResponse = (message) => {
 
 export const getRandomTip = () => {
   const tips = [
-    "💡 ELARA: Recuerda que puedes cambiar el Grado de Primaria (1º a 6º) directamente en la barra superior de Planeación.",
+    "💡 ELARA: Recuerda que puedes cambiar el Grado de Secundaria (1º a 3º) directamente en la barra superior de Planeación.",
     "📋 ELARA: Si deseas completar tu planeación semanal de Lunes a Viernes de inmediato, pídemelo en el chat diciéndome 'llena la planeacion'.",
     "📚 ELARA: Tus planeaciones y proyectos se guardan localmente de forma privada en tu base de datos SQLite.",
     "🧬 ELARA: Motor pedagógico listo para apoyarte con los aprendizajes PDA de la Nueva Escuela Mexicana (NEM).",
