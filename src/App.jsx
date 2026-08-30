@@ -7,6 +7,7 @@ import GeneradorMaterial from './components/GeneradorMaterial';
 import Licencia from './components/Licencia';
 import ConfiguracionCiclo from './components/ConfiguracionCiclo';
 import DashboardGrupos from './components/DashboardGrupos';
+import ControlQR from './components/ControlQR';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
@@ -506,6 +507,7 @@ function App() {
   if(vista === 'MENU') {
     const menuItems = [
       { id: 'GRUPO', icon: '👥', label: grupoActual ? `${grupoActual.grado}º${grupoActual.seccion} ${grupoActual.nombre_disciplina}` : 'Mi Grupo', desc: `${alumnos.length} alumnos`, color: '#6C5CE7', action: ()=>setVista('GRUPO') },
+      { id: 'CONTROL_QR', icon: '📱', label: 'Control QR', desc: 'Asistencia y Escáner', color: '#00CEC9', action: ()=>setVista('CONTROL_QR') },
       { id: 'EVAL', icon: '📝', label: 'Evaluación', desc: 'Calificaciones diarias', color: '#00B894', action: ()=>{setVista('EVAL'); cargarEval();} },
       { id: 'TRIMESTRAL', icon: '📊', label: 'Trimestral', desc: 'Reporte por período', color: '#E17055', action: ()=>{setVista('TRIMESTRAL'); setTrimestre(1);} },
       { id: 'PLANNER', icon: '📅', label: 'Planeación', desc: 'Secuencia semanal', color: '#0984E3', action: ()=>setVista('PLANNER') },
@@ -582,6 +584,31 @@ function App() {
         </div>
     </div>
   );}
+
+  if(vista === 'CONTROL_QR') {
+      return (
+        <div className="pantalla-dosificador">
+          <div className="header-dosificador no-print">
+            <h2>📱 Control QR</h2>
+            <button className="btn-volver" onClick={() => setVista('MENU')}>Volver al Menú</button>
+          </div>
+          <ControlQR
+            grupoActual={grupoActual}
+            alumnos={alumnos}
+            criterios={criterios}
+            fechaEval={fechaEval}
+            ipcRenderer={ipcRenderer}
+            showToast={showToast}
+            onAttendanceUpdated={() => {
+              if (typeof cargarEval === 'function') cargarEval();
+            }}
+            onGradeSaved={() => {
+              if (typeof cargarEval === 'function') cargarEval();
+            }}
+          />
+        </div>
+      );
+  }
 
   if(vista === 'MATERIALES') {
       return <GeneradorMaterial onVolver={() => setVista('MENU')} pdasDisponibles={pdasDisponibles} grado={grado} />;
