@@ -38,8 +38,18 @@ function getLocalIps() {
   return ips;
 }
 
+// Asegurar que exista la carpeta userData antes de cualquier operacion de archivo
+const userDataDir = app.getPath('userData');
+if (!fs.existsSync(userDataDir)) {
+  try {
+    fs.mkdirSync(userDataDir, { recursive: true });
+  } catch (e) {
+    console.error("Error creando directorio userData:", e);
+  }
+}
+
 // --- LOGGING TO FILE SYSTEM ---
-const logPath = path.join(app.getPath('userData'), 'app_debug.log');
+const logPath = path.join(userDataDir, 'app_debug.log');
 try { fs.writeFileSync(logPath, '--- App Start ---\n'); } catch(e) {}
 ipcMain.on('log-to-file', (event, message) => {
   try { fs.appendFileSync(logPath, message + '\n'); } catch(e) {}
@@ -52,12 +62,14 @@ const dbName = 'nem_primaria.db';
 if (app.isPackaged) {
   // Producción: la DB está en extraResources
   const rutaResources = path.join(process.resourcesPath, dbName);
-  const rutaUserData = path.join(app.getPath('userData'), dbName);
+  const rutaUserData = path.join(userDataDir, dbName);
   // Copiar la DB a userData si no existe (primera ejecución)
   if (!fs.existsSync(rutaUserData)) {
-    fs.copyFileSync(rutaResources, rutaUserData);
+    if (fs.existsSync(rutaResources)) {
+      try { fs.copyFileSync(rutaResources, rutaUserData); } catch(e) { console.error("Error copiando DB:", e); }
+    }
   }
-  dbPath = rutaUserData;
+  dbPath = fs.existsSync(rutaUserData) ? rutaUserData : rutaResources;
 } else {
   // Desarrollo
   const rutaRaiz = path.join(__dirname, '..', dbName);
