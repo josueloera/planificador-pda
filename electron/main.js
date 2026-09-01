@@ -253,20 +253,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Si la licencia guardada es una licencia vieja de 4 bloques (sin API key de OpenAI), la eliminamos
-  // para forzar al usuario a reactivar la app usando su nueva clave con la API Key integrada.
-  const dataPath = path.join(app.getPath('userData'), 'license.json');
-  if (fs.existsSync(dataPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-      if (data.licenseKey && data.licenseKey.split('-').length <= 4) {
-        console.log("⚠️ Detectada licencia antigua sin API Key. Reseteando licencia para forzar reactivación...");
-        fs.unlinkSync(dataPath);
-      }
-    } catch (e) {
-      console.error("Error al verificar licencia antigua:", e);
-    }
-  }
   createWindow();
 });
 
