@@ -6,7 +6,6 @@ import { obtenerPlanSemanal } from './planner_logic';
 import GeneradorMaterial from './components/GeneradorMaterial';
 import Licencia from './components/Licencia';
 import ConfiguracionCiclo from './components/ConfiguracionCiclo';
-import ConfigurarIA from './components/ConfigurarIA';
 import DashboardGrupos from './components/DashboardGrupos';
 import ControlQR from './components/ControlQR';
 
@@ -520,7 +519,6 @@ function App() {
       { id: 'BITACORA', icon: '📂', label: 'Bitácora', desc: 'Fichas e incidencias', color: '#636E72', action: ()=>{setVista('BITACORA'); setAlumnoBitacora(null);} },
       { id: 'MATERIALES', icon: '🧩', label: 'Materiales', desc: 'Exámenes y juegos', color: '#FF9F43', action: ()=>setVista('MATERIALES') },
       { id: 'CONFIG', icon: '⚙️', label: 'Ajustes Ciclo', desc: 'Fechas y SEP', color: '#2C3E50', action: ()=>setVista('CONFIG') },
-      { id: 'CONFIG_IA', icon: '🤖', label: 'Motor de IA', desc: 'Ollama y personal', color: '#6C5CE7', action: ()=>setShowConfigIAModal(true) },
     ];
     return (
     <div className="pantalla-menu">
@@ -585,7 +583,6 @@ function App() {
                 </button>
             ))}
         </div>
-        {showConfigIAModal && <ConfigurarIA onCerrar={() => setShowConfigIAModal(false)} />}
     </div>
   );}
 
