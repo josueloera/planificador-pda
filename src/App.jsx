@@ -86,7 +86,6 @@ function App() {
   // LICENCIA
   const [licenciaInfo, setLicenciaInfo] = useState(null);
   const [cargandoLicencia, setCargandoLicencia] = useState(true);
-  const [showConfigIAModal, setShowConfigIAModal] = useState(false);
 
   // ESTADOS
   const [alumnos, setAlumnos] = useState([]);
