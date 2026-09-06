@@ -237,7 +237,7 @@ function App() {
         setPdasDisponibles(filePdas);
 
         if(vista === 'PROYECTOS') {
-          ipcRenderer.invoke('get-proyectos', grupoActual?.id).then(guardadosRes => {
+          ipcRenderer.invoke('get-proyectos', grupoActual?.id, grado).then(guardadosRes => {
             const guardados = (guardadosRes || []).map(p => ({ ...p, pdas_seleccionados: safeParse(p.pdas_seleccionados, []), fases_contenido: safeParse(p.fases_contenido, {}) }));
             const sugeridos = filePdas.map((p) => ({
               id: `sug-${p.id}`, nombre: p.proyecto_sugerido, metodologia: detectarMetodologia(p.campo),
@@ -276,7 +276,7 @@ function App() {
     }
 
     if(ipcRenderer && vista === 'PLANNER') {
-        ipcRenderer.invoke('get-planeacion', grupoActual?.id, semanaPlan).then(res => setPlanData(res && res.id ? res : { lunes_inicio: '', lunes_desarrollo: '', lunes_cierre: '', martes_inicio: '', martes_desarrollo: '', martes_cierre: '', miercoles_inicio: '', miercoles_desarrollo: '', miercoles_cierre: '', jueves_inicio: '', jueves_desarrollo: '', jueves_cierre: '', viernes_inicio: '', viernes_desarrollo: '', viernes_cierre: '', recursos: '', evaluacion: '', adecuaciones: '' }));
+        ipcRenderer.invoke('get-planeacion', grupoActual?.id, semanaPlan, grado).then(res => setPlanData(res && res.id ? res : { lunes_inicio: '', lunes_desarrollo: '', lunes_cierre: '', martes_inicio: '', martes_desarrollo: '', martes_cierre: '', miercoles_inicio: '', miercoles_desarrollo: '', miercoles_cierre: '', jueves_inicio: '', jueves_desarrollo: '', jueves_cierre: '', viernes_inicio: '', viernes_desarrollo: '', viernes_cierre: '', recursos: '', evaluacion: '', adecuaciones: '' }));
     }
   }, [vista, semanaPlan, grado, grupoActual]);
 
@@ -514,7 +514,7 @@ function App() {
       { id: 'DOSIF', icon: '🚦', label: 'Dosificador', desc: 'Distribución anual', color: '#FDCB6E', action: ()=>setVista('DOSIF') },
       { id: 'CALENDARIO', icon: '📆', label: 'Calendario', desc: 'Eventos SEP', color: '#A29BFE', action: ()=>{setVista('CALENDARIO'); ipcRenderer.invoke('get-eventos-oficiales').then(setEventosSEP);} },
       { id: 'COMISIONES', icon: '🔔', label: 'Comisiones', desc: `${comisiones.length} pendientes`, color: '#FD79A8', action: ()=>setVista('COMISIONES') },
-      { id: 'PROYECTOS', icon: '🚀', label: 'Proyectos', desc: 'Didácticos NEM', color: '#00CEC9', action: ()=>{setVista('PROYECTOS'); ipcRenderer.invoke('get-proyectos', grupoActual?.id).then(setListaProyectos);} },
+      { id: 'PROYECTOS', icon: '🚀', label: 'Proyectos', desc: 'Didácticos NEM', color: '#00CEC9', action: ()=>{setVista('PROYECTOS'); ipcRenderer.invoke('get-proyectos', grupoActual?.id, grado).then(setListaProyectos);} },
       { id: 'BITACORA', icon: '📂', label: 'Bitácora', desc: 'Fichas e incidencias', color: '#636E72', action: ()=>{setVista('BITACORA'); setAlumnoBitacora(null);} },
       { id: 'MATERIALES', icon: '🧩', label: 'Materiales', desc: 'Exámenes y juegos', color: '#FF9F43', action: ()=>setVista('MATERIALES') },
       { id: 'CONFIG', icon: '⚙️', label: 'Ajustes Ciclo', desc: 'Fechas y SEP', color: '#2C3E50', action: ()=>setVista('CONFIG') },
