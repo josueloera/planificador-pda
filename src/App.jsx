@@ -650,21 +650,21 @@ function App() {
       const estiloCampo = CAMPOS_FORMATIVOS.find(c => c.id === campoActual) || CAMPOS_FORMATIVOS[0]; 
       
       return (
-      <div className="pantalla-dosificador">
+      <div className="pantalla-dosificador" style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {toast && (
               <div style={{position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:'#34495e', color:'white', padding:'10px 20px', borderRadius:20, zIndex:9999, fontWeight:'bold', boxShadow:'0 4px 10px rgba(0,0,0,0.2)'}}>
                   {toast}
               </div>
           )}
-          <div className="header-dosificador">
+          <div className="header-dosificador" style={{ flexShrink: 0, marginBottom: '12px' }}>
               <div style={{display:'flex', gap:15, alignItems:'center'}}><h2>📝 Evaluación ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><input type="date" value={fechaEval} onChange={e=>{setFechaEval(e.target.value); cargarEval();}} style={{fontSize:'1.1rem', padding:'5px', border:'2px solid #004aad', borderRadius:5}} /></div>
               <div><button className="btn-volver" style={{marginRight:10, background: modoConfig ? '#7f8c8d' : '#e67e22'}} onClick={()=>setModoConfig(!modoConfig)}>{modoConfig ? '↩ Volver' : '⚙️ Configurar'}</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div>
           </div>
           {/* En secundaria ya no mostramos pestañas de campos formativos, los criterios son de la asignatura/grupo directamente */}
-          <div style={{borderTop:`5px solid ${estiloCampo.borde}`, flexGrow:1, display:'flex', flexDirection:'column'}}>
+          <div style={{borderTop:`5px solid ${estiloCampo.borde}`, flexGrow:1, display:'flex', flexDirection:'column', minHeight: 0, overflow: 'hidden'}}>
             
             {modoConfig ? (
-                <div className="columna-gestion" style={{maxWidth:700, margin:'20px auto', padding:30, borderRadius:15, boxShadow:'0 4px 15px rgba(0,0,0,0.1)'}}>
+                <div className="columna-gestion" style={{maxWidth:700, margin:'20px auto', padding:30, borderRadius:15, boxShadow:'0 4px 15px rgba(0,0,0,0.1)', overflowY: 'auto'}}>
                     <h3 style={{textAlign:'center', color:estiloCampo.borde}}>⚙️ Criterios de Evaluación</h3>
                     <div style={{background:'#eee', height:25, borderRadius:15, margin:'20px 0', position:'relative', overflow:'hidden'}}><div style={{width:`${Math.min(sumaPorcentajes, 100)}%`, background:sumaPorcentajes===100?'#2ecc71':'#e74c3c', height:'100%', transition:'width 0.5s'}}></div><span style={{position:'absolute', width:'100%', textAlign:'center', top:3, fontWeight:'bold', fontSize:'0.9rem', color:'#333'}}>Suma: {sumaPorcentajes}%</span></div>
                     <div style={{background:'#fafafa', padding:15, borderRadius:10, border:'1px solid #ddd'}}>
@@ -703,7 +703,43 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
                     </div>
                 </div>
             ) : (
-                <div className="tabla-container"><table className="tabla-eval"><thead><tr><th style={{width:50, textAlign:'center'}}>Nº</th><th style={{width:250}}>ALUMNO</th>{(criterios || []).map((c,i)=><th key={i}>{c.nombre}<br/><small style={{opacity:0.8}}>{c.porcentaje}%</small></th>)}<th style={{background:'#2c3e50', color:'white', width:'80px', textAlign:'center'}}>HOY</th></tr></thead><tbody>{(alumnos || []).map((al, index)=>{const prom = calcularPromedioDiario(al.id); return (<tr key={al.id} style={{backgroundColor: getColorSemaforo(prom)}}><td style={{textAlign:'center', fontWeight:'bold', color:'#555'}}>{index + 1}</td><td className="celda-nombre">{al.nombre}</td>{(criterios || []).map(c=>( <td key={c.frontId}><CeldaNota idAlumno={al.id} idCriterio={c.id} valorInicial={notas[`${al.id}-${c.id}`]} onGuardar={handleSaveNota} /></td> ))}<td style={{textAlign:'center', fontWeight:'bold', fontSize:'1.2rem'}}>{prom || '-'}</td></tr>);})}</tbody></table></div>
+                <div className="tabla-container" style={{ flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
+                  <table className="tabla-eval">
+                    <thead>
+                      <tr>
+                        <th style={{width:50, textAlign:'center', position: 'sticky', top: 0, zIndex: 10, background: '#1e293b', color: '#ffffff'}}>Nº</th>
+                        <th style={{width:250, textAlign: 'left', position: 'sticky', top: 0, zIndex: 10, background: '#1e293b', color: '#ffffff'}}>ALUMNO</th>
+                        {(criterios || []).map((c,i)=>(
+                          <th key={i} style={{ position: 'sticky', top: 0, zIndex: 10, background: '#1e293b', color: '#ffffff', textAlign: 'center' }}>
+                            <span style={{ fontWeight: '800', fontSize: '13px' }}>{c.nombre}</span>
+                            <br/>
+                            <small style={{ color: '#93c5fd', fontWeight: 'bold' }}>{c.porcentaje}%</small>
+                          </th>
+                        ))}
+                        <th style={{background:'#0f172a', color:'#38bdf8', width:'90px', textAlign:'center', position: 'sticky', top: 0, zIndex: 10, fontWeight: '800'}}>HOY</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(alumnos || []).map((al, index)=>{
+                        const prom = calcularPromedioDiario(al.id); 
+                        return (
+                          <tr key={al.id} style={{backgroundColor: getColorSemaforo(prom), borderBottom: '1px solid #f1f5f9'}}>
+                            <td style={{textAlign:'center', fontWeight:'bold', color:'#64748b'}}>{index + 1}</td>
+                            <td className="celda-nombre" style={{ color: '#0f172a', fontWeight: '800', textTransform: 'uppercase', fontSize: '13px', background: '#ffffff', borderRight: '2px solid #cbd5e1' }}>
+                              {al.nombre}
+                            </td>
+                            {(criterios || []).map(c=>( 
+                              <td key={c.frontId} style={{ textAlign: 'center' }}>
+                                <CeldaNota idAlumno={al.id} idCriterio={c.id} valorInicial={notas[`${al.id}-${c.id}`]} onGuardar={handleSaveNota} />
+                              </td> 
+                            ))}
+                            <td style={{textAlign:'center', fontWeight:'800', fontSize:'1.2rem', color: '#0f172a'}}>{prom || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
             )}
           </div>
       </div>

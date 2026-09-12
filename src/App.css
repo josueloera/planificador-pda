@@ -251,33 +251,36 @@
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
     flex-grow: 1;
+    min-height: 0;
   }
   
   table { width: 100%; border-collapse: collapse; }
-  th {
-    background: #2c3e50;
-    color: white;
-    padding: 15px;
+  .tabla-eval th {
+    background: #1e293b;
+    color: #ffffff;
+    padding: 12px 15px;
     position: sticky;
     top: 0;
     z-index: 10;
-    font-weight: 500;
+    font-weight: 700;
     text-transform: uppercase;
     font-size: 0.85rem;
     letter-spacing: 0.5px;
+    border-bottom: 2px solid #334155;
   }
   td {
     padding: 8px;
-    border-bottom: 1px solid #f0f0f0;
-    color: #444;
+    border-bottom: 1px solid #f1f5f9;
+    color: #0f172a;
   }
   .celda-nombre {
-    background: #fff;
-    font-weight: 600;
+    background: #ffffff;
+    font-weight: 700;
     position: sticky;
     left: 0;
     z-index: 5;
-    border-right: 2px solid #eee;
+    border-right: 2px solid #cbd5e1;
+    color: #0f172a;
   }
   .input-nota {
     border: 1px solid transparent;
@@ -419,88 +422,139 @@
   /* =========================================
      ESTILOS DE IMPRESIÓN (MODO DOCUMENTO FORMAL)
      ========================================= */
-  @media print {
-    @page { margin: 2cm; size: auto; }
-    
-    body { background: white; color: black; -webkit-print-color-adjust: exact; }
   
-    /* 1. OCULTAR TODO LO QUE NO ES DOCUMENTO */
-    .pantalla-menu, .sidebar-lista, .btn-volver, .btn-guardar, 
-    .header-dosificador, .tabs-trimestres, .tabs-bitacora,
-    .config-grid .columna-gestion:first-child,
-    /* Ocultar el título de "Editar Proyecto" */
-    .titulo-edicion, 
-    .botones-edicion, 
-    .no-print { 
-      display: none !important; 
-    }
-  
-    .pantalla-dosificador { padding: 0 !important; display: block !important; height: auto !important; background: white !important; }
-    .hoja-planeacion { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; background: white !important; }
-  
-    /* 2. FORMATO DE TEXTO FORMAL */
-    * { font-family: 'Times New Roman', Times, serif !important; }
-  
-    /* 3. TRANSFORMACIÓN DEL NOMBRE DEL PROYECTO EN TÍTULO */
-    .grupo-nombre label { display: none !important; }
-    .grupo-nombre input {
-      font-size: 24pt !important;
-      font-weight: bold !important;
-      text-align: center;
-      border: none !important;
-      border-bottom: 2px solid black !important;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      text-transform: uppercase;
-    }
-  
-    /* 4. METODOLOGÍA Y OTROS CAMPOS */
-    .grupo-input label { text-transform: uppercase; font-size: 10pt; color: #444 !important; }
-    .grupo-input input, .grupo-input select {
-      border: none !important;
-      background: transparent !important;
-      font-size: 12pt !important;
-      padding: 0 !important;
-      appearance: none;
-    }
-  
-    /* 5. FASES DE DESARROLLO */
-    .momento { border: none !important; margin-bottom: 15px; padding: 0 !important; page-break-inside: avoid; }
-    .label-momento {
-      font-size: 11pt !important;
-      color: black !important;
-      font-weight: bold !important;
-      background: transparent !important;
-      text-decoration: underline;
-      margin-bottom: 5px;
-      display: block;
-    }
-    textarea {
-      font-size: 12pt !important;
-      line-height: 1.5;
-      text-align: justify;
-      padding: 0 !important;
-      border: none !important;
-      height: auto !important;
-      resize: none;
-      overflow: visible;
-    }
-  
-    /* 6. LIMPIEZA DE LISTA DE PDAs (SOLO TEXTO) */
-    .seccion-plan { border: none !important; background: transparent !important; margin-top: 30px !important; }
-    .pdas-print-view { display: block !important; }
-    
-    .titulo-seccion-pdas { 
-      border-bottom: 1px solid black; 
-      text-transform: uppercase; 
-      margin-bottom: 10px; 
-    }
-  
-    /* --- AJUSTES PARA EL PLANNER SEMANAL (SI SE IMPRIME ESO) --- */
-    .dia-plan, .caja-footer { border: 1px solid black !important; }
-    .titulo-dia, .caja-footer h4 { 
-      background: #eee !important; 
-      color: black !important; 
-      border-bottom: 1px solid black; 
-    }
+/* =========================================================
+   ESTILOS DE IMPRESIÓN FORMAL (DOCUMENTO OFICIAL SEP)
+   ========================================================= */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 1cm;
   }
+
+  body, html {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ocultar elementos de UI, navegadores, botones, selects y asistente */
+  .no-print, .header-dosificador, .btn-volver, .btn-guardar, .grid-menu, 
+  .clippy-container, .clippy-trigger, .elara-duda-alert-bar, .alert-button-glow,
+  select, button, input[type="button"], input[type="submit"], input[type="checkbox"],
+  .botones-edicion, .titulo-edicion, .sidebar-lista, .tabs-trimestres, .tabs-bitacora {
+    display: none !important;
+  }
+
+  /* Contenedor principal sin límites ni barras de scroll */
+  .pantalla-dosificador, .hoja-planeacion, .tabla-container {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    background: white !important;
+  }
+
+  /* FORZAR EXPANSIÓN TOTAL DE TEXTAREAS (QUITAR SCROLLBARS Y ARROW BUTTONS) */
+  textarea {
+    border: none !important;
+    background: transparent !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 40px !important;
+    overflow: visible !important;
+    resize: none !important;
+    box-shadow: none !important;
+    font-size: 10.5pt !important;
+    font-family: 'Calibri', 'Arial', sans-serif !important;
+    line-height: 1.4 !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Estructura formal de cuadrícula semanal */
+  .grid-semanal {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-top: 15px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .dia-plan {
+    border: 1.5px solid #2c3e50 !important;
+    padding: 6px !important;
+    background: white !important;
+    display: flex !important;
+    flex-direction: column !important;
+    page-break-inside: avoid !important;
+  }
+
+  .titulo-dia {
+    background-color: #2c3e50 !important;
+    color: white !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    padding: 4px !important;
+    margin-bottom: 6px !important;
+    font-size: 9.5pt !important;
+    text-transform: uppercase !important;
+  }
+
+  /* Pie de planeación (Recursos, Evaluación, Adecuaciones) */
+  .footer-plan {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+    margin-top: 15px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .caja-footer {
+    border: 1.5px solid #2c3e50 !important;
+    padding: 8px !important;
+    background: white !important;
+  }
+
+  .caja-footer h4 {
+    margin: 0 0 5px 0 !important;
+    font-size: 9.5pt !important;
+    color: #2c3e50 !important;
+    border-bottom: 1px solid #7f8c8d !important;
+    padding-bottom: 3px !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+  }
+
+  /* Mostrar Encabezado y Firmas Oficiales al imprimir */
+  .print-header-oficial, .print-signatures-area {
+    display: block !important;
+  }
+}
+
+
+/* Regla general para vista en pantalla de texto exclusivo de impresión */
+.only-print-text {
+  display: none !important;
+}
+
+@media print {
+  .no-print, textarea {
+    display: none !important;
+  }
+  .only-print-text {
+    display: block !important;
+  }
+}
