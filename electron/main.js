@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -266,6 +267,37 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // ── AUTO-UPDATER ──────────────────────────────────────────────────────
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('update-available', (info) => {
+      console.log(`🔄 Actualización disponible: v${info.version}`);
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.webContents.send('update-available', info.version);
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log(`✅ Actualización descargada: v${info.version}`);
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.webContents.send('update-downloaded', info.version);
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('Auto-updater error:', err.message);
+    });
+
+    setTimeout(() => autoUpdater.checkForUpdates(), 5000);
+    setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000);
+  }
+  // ─────────────────────────────────────────────────────────────────────
+});
+
+// IPC: el renderer puede pedir instalación inmediata
+ipcMain.on('install-update-now', () => {
+  autoUpdater.quitAndInstall(false, true);
 });
 
 app.on('window-all-closed', () => {

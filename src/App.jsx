@@ -160,6 +160,21 @@ function App() {
   const [cargandoReporte, setCargandoReporte] = useState(false); 
   const [campoActual, setCampoActual] = useState('LENGUAJES');
   const [vistos, setVistos] = useState({});
+  const [updateStatus, setUpdateStatus] = useState(null); // null | { tipo: 'available'|'downloaded', version: '' }
+
+  // ── LISTENER ACTUALIZACIONES AUTOMÁTICAS ──────────────────────────────
+  useEffect(() => {
+    if (!ipcRenderer) return;
+    const onAvailable = (_, version) => setUpdateStatus({ tipo: 'available', version });
+    const onDownloaded = (_, version) => setUpdateStatus({ tipo: 'downloaded', version });
+    ipcRenderer.on('update-available', onAvailable);
+    ipcRenderer.on('update-downloaded', onDownloaded);
+    return () => {
+      ipcRenderer.removeListener('update-available', onAvailable);
+      ipcRenderer.removeListener('update-downloaded', onDownloaded);
+    };
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────
 
   const toggleVisto = (tipo, id) => {
       const isVisto = (vistos[tipo] || []).includes(String(id));
@@ -492,19 +507,52 @@ function App() {
     return <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', fontSize:'1.5rem', color:'#555'}}>Verificando licencia...</div>;
   }
 
-  // Si requiere activación y no está en prueba válida
-  if (licenciaInfo && !licenciaInfo.isActivated && !licenciaInfo.isTrialValid) {
-    return <Licencia onActivated={() => {
-      // Recargar estado de licencia
-      ipcRenderer.invoke('get-license-status').then(res => {
-        setLicenciaInfo(res);
-        window.openaiApiKey = res.openaiApiKey || '';
-        window.location.reload(); // Forzar recarga limpia para resetear estado visual
-      });
-    }} />;
-  }
+  const updateBanner = updateStatus ? (
+    <div style={{
+      position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999,
+      background: updateStatus.tipo === 'downloaded' ? 'linear-gradient(135deg,#1a237e,#283593)' : 'linear-gradient(135deg,#1b5e20,#2e7d32)',
+      color: '#fff', borderRadius: '12px', padding: '14px 18px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.4)', maxWidth: '320px',
+      display: 'flex', flexDirection: 'column', gap: '8px',
+      fontFamily: 'system-ui,sans-serif', fontSize: '13px',
+      animation: 'fadeInUp 0.4s ease'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '14px' }}>
+        <span>{updateStatus.tipo === 'downloaded' ? '✅' : '🔄'}</span>
+        <span>{updateStatus.tipo === 'downloaded' ? 'Actualización lista' : 'Actualización disponible'}</span>
+      </div>
+      <div style={{ opacity: 0.85 }}>
+        {updateStatus.tipo === 'downloaded'
+          ? `v${updateStatus.version} lista. Se instalará cuando cierres la app.`
+          : `v${updateStatus.version} descargándose en segundo plano...`}
+      </div>
+      {updateStatus.tipo === 'downloaded' && (
+        <button
+          onClick={() => ipcRenderer && ipcRenderer.send('install-update-now')}
+          style={{ marginTop: '4px', background: '#fff', color: '#1a237e', border: 'none', borderRadius: '8px', padding: '6px 14px', fontWeight: 700, cursor: 'pointer', fontSize: '12px', alignSelf: 'flex-start' }}
+        >Instalar ahora</button>
+      )}
+      <button
+        onClick={() => setUpdateStatus(null)}
+        style={{ position: 'absolute', top: '8px', right: '10px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}
+      >×</button>
+    </div>
+  ) : null;
 
-  if(vista === 'MENU') {
+  const renderContent = () => {
+    // Si requiere activación y no está en prueba válida
+    if (licenciaInfo && !licenciaInfo.isActivated && !licenciaInfo.isTrialValid) {
+      return <Licencia onActivated={() => {
+        // Recargar estado de licencia
+        ipcRenderer.invoke('get-license-status').then(res => {
+          setLicenciaInfo(res);
+          window.openaiApiKey = res.openaiApiKey || '';
+          window.location.reload(); // Forzar recarga limpia para resetear estado visual
+        });
+      }} />;
+    }
+
+    if(vista === 'MENU') {
     const menuItems = [
       { id: 'GRUPO', icon: '👥', label: grupoActual ? `${grupoActual.grado}º${grupoActual.seccion} ${grupoActual.nombre_disciplina}` : 'Mi Grupo', desc: `${alumnos.length} alumnos`, color: '#6C5CE7', action: ()=>setVista('GRUPO') },
       { id: 'CONTROL_QR', icon: '📱', label: 'Control QR', desc: 'Asistencia y Escáner', color: '#00CEC9', action: ()=>setVista('CONTROL_QR') },
@@ -767,10 +815,18 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
   if(vista === 'COMISIONES') return ( <div className="pantalla-dosificador"> <div className="header-dosificador"> <h2>🔔 Comisiones</h2> <button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button> </div> <div className="config-grid"> <div className="columna-gestion"> <h3>Nueva</h3> <input value={nuevaComision.descripcion} onChange={e=>setNuevaComision({...nuevaComision, descripcion:e.target.value})} placeholder="Descripción"/> <input type="date" value={nuevaComision.fecha} onChange={e=>setNuevaComision({...nuevaComision, fecha:e.target.value})}/> <button className="btn-guardar" onClick={()=>{ipcRenderer.invoke('add-comision', nuevaComision).then(()=>{ipcRenderer.invoke('get-comisiones').then(setComisiones); alert('Agregada')})}}>Guardar</button> </div> <div className="columna-gestion"> <h3>Lista</h3> {comisiones.map(c=><div key={c.id}><b>{c.fecha}</b>: {c.descripcion}</div>)} </div> </div> </div> );
   if(vista === 'CALENDARIO') return (<div className="pantalla-dosificador"><div className="header-dosificador"><div><button onClick={mesAnterior}>◀</button> <h2 style={{color:'black'}}>{NOMBRES_MESES[mesCal]} {anioCal}</h2> <button onClick={mesSiguiente}>▶</button></div><div><button onClick={()=>setModoConfigCalendario(!modoConfigCalendario)} style={{background: modoConfigCalendario ? '#e67e22' : '#3498db', color: 'white', marginRight:10, padding: '10px'}}>{modoConfigCalendario ? '✅ Terminar' : '⚙️ Configurar SEP'}</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div></div>{modoConfigCalendario && (<div style={{background:'white', padding:15, marginBottom:15, borderRadius:8, boxShadow:'0 2px 5px rgba(0,0,0,0.1)', display:'flex', gap:10, flexWrap:'wrap'}}>{Object.keys(TIPOS_EVENTO).map(k=>(<button key={k} onClick={()=>setHerramientaSeleccionada(k)} style={{background: TIPOS_EVENTO[k].color, color: TIPOS_EVENTO[k].texto, border: herramientaSeleccionada===k ? '3px solid black' : '1px solid #ccc', padding: '8px 15px', fontWeight: 'bold', cursor: 'pointer'}}>{TIPOS_EVENTO[k].label}</button>))}</div>)}<div className="grid-calendario-header"><div>DOM</div><div>LUN</div><div>MAR</div><div>MIE</div><div>JUE</div><div>VIE</div><div>SAB</div></div><div className="grid-calendario-dias">{renderCal()}</div></div>);
 
-  if(vista === 'GRUPOS') {
-    return <DashboardGrupos onSelectGrupo={(g) => { setGrupoActual(g); setGrado(g.grado); localStorage.setItem('grado', g.grado); setVista('MENU'); }} />;
-  }
+    if(vista === 'GRUPOS') {
+      return <DashboardGrupos onSelectGrupo={(g) => { setGrupoActual(g); setGrado(g.grado); localStorage.setItem('grado', g.grado); setVista('MENU'); }} />;
+    }
 
-  return null;
+    return null;
+  };
+
+  return (
+    <>
+      {renderContent()}
+      {updateBanner}
+    </>
+  );
 }
 export default App;
