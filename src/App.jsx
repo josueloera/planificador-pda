@@ -110,6 +110,8 @@ function App() {
   const [notas, setNotas] = useState({}); 
   const [fechaEval, setFechaEval] = useState(new Date().toISOString().split('T')[0]);
   const [modoConfig, setModoConfig] = useState(false);
+  const [showModalImportarQR, setShowModalImportarQR] = useState(false);
+  const [criterioImportarTarget, setCriterioImportarTarget] = useState('');
   
   // OTROS
   const [textoPegado, setTextoPegado] = useState("");
@@ -706,8 +708,79 @@ function App() {
           )}
           <div className="header-dosificador" style={{ flexShrink: 0, marginBottom: '12px' }}>
               <div style={{display:'flex', gap:15, alignItems:'center'}}><h2>📝 Evaluación ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><input type="date" value={fechaEval} onChange={e=>{setFechaEval(e.target.value); cargarEval();}} style={{fontSize:'1.1rem', padding:'5px', border:'2px solid #004aad', borderRadius:5}} /></div>
-              <div><button className="btn-volver" style={{marginRight:10, background: modoConfig ? '#7f8c8d' : '#e67e22'}} onClick={()=>setModoConfig(!modoConfig)}>{modoConfig ? '↩ Volver' : '⚙️ Configurar'}</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div>
+              <div style={{display:'flex', gap:8}}>
+                <button
+                  className="btn-volver"
+                  style={{background: '#27ae60', color: 'white'}}
+                  onClick={() => {
+                    if (!criterios || criterios.length === 0) {
+                      showToast('⚠️ Primero debes configurar criterios para este grupo.');
+                      return;
+                    }
+                    setCriterioImportarTarget(criterios[0]?.id || '');
+                    setShowModalImportarQR(true);
+                  }}
+                >
+                  📥 Importar desde Control QR
+                </button>
+                <button className="btn-volver" style={{background: modoConfig ? '#7f8c8d' : '#e67e22'}} onClick={()=>setModoConfig(!modoConfig)}>{modoConfig ? '↩ Volver' : '⚙️ Configurar'}</button>
+                <button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button>
+              </div>
           </div>
+
+          {/* MODAL IMPORTAR DESDE CONTROL QR */}
+          {showModalImportarQR && (
+            <div style={{position:'fixed', top:0, left:0, width:'100vw', height:'100vh', backgroundColor:'rgba(0,0,0,0.5)', zIndex:10000, display:'flex', justifyContent:'center', alignItems:'center'}}>
+              <div style={{backgroundColor:'white', borderRadius:'12px', padding:'24px', width:'450px', boxShadow:'0 8px 24px rgba(0,0,0,0.2)'}}>
+                <h3 style={{marginTop:0, color:'#004aad'}}>📥 Importar Promedios QR a Evaluador</h3>
+                <p style={{fontSize:'13px', color:'#555'}}>
+                  Importará el promedio de trabajos QR del <strong>{fechaEval}</strong> al criterio seleccionado para <strong>{grupoActual?.nombre_disciplina}</strong>.
+                </p>
+                <div style={{marginBottom:'15px'}}>
+                  <label style={{display:'block', fontWeight:'bold', marginBottom:'6px', fontSize:'13px'}}>Selecciona Criterio Destino:</label>
+                  <select
+                    value={criterioImportarTarget}
+                    onChange={(e) => setCriterioImportarTarget(e.target.value)}
+                    style={{width:'100%', padding:'10px', borderRadius:'6px', border:'1px solid #ccc', fontWeight:'bold'}}
+                  >
+                    {criterios.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre} ({c.porcentaje}%)</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginTop:'20px'}}>
+                  <button
+                    onClick={() => setShowModalImportarQR(false)}
+                    style={{padding:'8px 16px', borderRadius:'6px', border:'1px solid #ccc', background:'#f8f9fa', cursor:'pointer'}}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!ipcRenderer || !criterioImportarTarget) return;
+                      try {
+                        const disciplina = grupoActual?.nombre_disciplina || 'TODOS';
+                        const count = await ipcRenderer.invoke('importar-promedios-qr-a-criterio', Number(criterioImportarTarget), fechaEval, fechaEval, disciplina, grupoActual?.id, fechaEval);
+                        setShowModalImportarQR(false);
+                        cargarEval();
+                        if (count > 0) {
+                          showToast(`✅ Promedios QR importados con éxito para ${count} alumnos.`);
+                        } else {
+                          showToast(`⚠️ No hay trabajos QR registrados el ${fechaEval} para esta materia.`);
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        showToast(`❌ Error al importar promedios: ${err.message}`);
+                      }
+                    }}
+                    style={{padding:'8px 20px', borderRadius:'6px', border:'none', background:'#27ae60', color:'white', fontWeight:'bold', cursor:'pointer'}}
+                  >
+                    📥 Confirmar Importación
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* En secundaria ya no mostramos pestañas de campos formativos, los criterios son de la asignatura/grupo directamente */}
           <div style={{borderTop:`5px solid ${estiloCampo.borde}`, flexGrow:1, display:'flex', flexDirection:'column', minHeight: 0, overflow: 'hidden'}}>
             

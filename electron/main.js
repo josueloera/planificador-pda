@@ -905,21 +905,39 @@ ipcMain.handle('delete-trabajo-qr', async (e, id) => new Promise(r => {
 }));
 
 // Importar promedios de trabajos por rango de fechas (o día único) hacia un criterio de evaluación
-ipcMain.handle('importar-promedios-qr-a-criterio', async (e, criterio_id, fechaInicio, fechaFin, campo, grupo_id, fechaNota) => new Promise(resolve => {
+ipcMain.handle('importar-promedios-qr-a-criterio', async (e, criterio_id, arg2, arg3, arg4, arg5, arg6) => new Promise(resolve => {
   if (!criterio_id) return resolve(0);
+
+  const isDate = (val) => typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
+
+  let fechaInicio, fechaFin, campo, grupo_id, fechaNota;
+  if (isDate(arg2) && isDate(arg3)) {
+    fechaInicio = arg2; fechaFin = arg3; campo = arg4; grupo_id = arg5; fechaNota = arg6 || arg3;
+  } else if (isDate(arg2)) {
+    fechaInicio = arg2; fechaFin = arg2; campo = arg3; grupo_id = arg4; fechaNota = arg5 || arg2;
+  } else {
+    fechaInicio = new Date().toISOString().split('T')[0];
+    fechaFin = fechaInicio; campo = arg3 || 'TODOS'; grupo_id = arg4 || null; fechaNota = fechaFin;
+  }
+
   const fIni = fechaInicio;
-  const fFin = fechaFin || fechaInicio;
+  const fFin = fechaFin;
   const targetFecha = fechaNota || fFin;
+  const cCampo = (campo && campo !== 'TODOS') ? String(campo).trim() : 'TODOS';
 
   let sql = `
     SELECT alumno_id, AVG(valor) as promedio 
     FROM trabajos_qr 
     WHERE fecha >= ? AND fecha <= ? 
       AND (grupo_id = ? OR grupo_id IS NULL) 
-      AND (campo = ? OR ? = 'TODOS') 
+      ${cCampo !== 'TODOS' ? 'AND (campo = ? OR UPPER(campo) = UPPER(?))' : ''}
     GROUP BY alumno_id
   `;
-  db.all(sql, [fIni, fFin, grupo_id || null, campo || 'TODOS', campo || 'TODOS'], (err, rows) => {
+
+  const params = [fIni, fFin, grupo_id || null];
+  if (cCampo !== 'TODOS') params.push(cCampo, cCampo);
+
+  db.all(sql, params, (err, rows) => {
     if (err || !rows || rows.length === 0) return resolve(0);
     let count = 0;
     let pending = rows.length;
@@ -931,13 +949,11 @@ ipcMain.handle('importar-promedios-qr-a-criterio', async (e, criterio_id, fechaI
             if (this.changes === 0) {
               db.run("INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)", 
                 [r.alumno_id, criterio_id, targetFecha, val], () => {
-                  count++;
-                  pending--;
+                  count++; pending--;
                   if (pending === 0) resolve(count);
                 });
             } else {
-              count++;
-              pending--;
+              count++; pending--;
               if (pending === 0) resolve(count);
             }
           });
@@ -950,8 +966,21 @@ ipcMain.handle('importar-promedios-qr-a-criterio', async (e, criterio_id, fechaI
 }));
 
 // Importar porcentaje de asistencia hacia un criterio de evaluación (escala 0-10 o configurable)
-ipcMain.handle('importar-asistencia-a-criterio', async (e, criterio_id, fechaInicio, fechaFin, grupo_id, escalaMax = 10, fechaNota) => new Promise(resolve => {
+ipcMain.handle('importar-asistencia-a-criterio', async (e, criterio_id, arg2, arg3, arg4, arg5, arg6) => new Promise(resolve => {
   if (!criterio_id) return resolve(0);
+
+  const isDate = (val) => typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
+
+  let fechaInicio, fechaFin, grupo_id, escalaMax, fechaNota;
+  if (isDate(arg2) && isDate(arg3)) {
+    fechaInicio = arg2; fechaFin = arg3; grupo_id = arg4; escalaMax = Number(arg5) || 10; fechaNota = arg6 || arg3;
+  } else if (isDate(arg2)) {
+    fechaInicio = arg2; fechaFin = arg2; grupo_id = arg3; escalaMax = Number(arg4) || 10; fechaNota = arg5 || arg2;
+  } else {
+    fechaInicio = new Date().toISOString().split('T')[0];
+    fechaFin = fechaInicio; grupo_id = arg3 || null; escalaMax = Number(arg4) || 10; fechaNota = fechaFin;
+  }
+
   const targetFecha = fechaNota || fechaFin;
 
   let sql = `
@@ -979,19 +1008,16 @@ ipcMain.handle('importar-asistencia-a-criterio', async (e, criterio_id, fechaIni
         const just = r.justificados || 0;
         const pct = (pres + ret * 0.5 + just * 0.8) / tot;
         const nota = Number((pct * escalaMax).toFixed(1));
-
         db.run("UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?",
           [nota, r.alumno_id, criterio_id, targetFecha], function() {
             if (this.changes === 0) {
               db.run("INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)",
                 [r.alumno_id, criterio_id, targetFecha, nota], () => {
-                  count++;
-                  pending--;
+                  count++; pending--;
                   if (pending === 0) resolve(count);
                 });
             } else {
-              count++;
-              pending--;
+              count++; pending--;
               if (pending === 0) resolve(count);
             }
           });
