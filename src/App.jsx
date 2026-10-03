@@ -96,11 +96,15 @@ function App() {
   const [criterios, setCriterios] = useState([]); 
   const criteriosRef = useRef([]);
   const [toast, setToast] = useState('');
+  const toastTimeoutRef = useRef(null);
 
   const showToast = (msg) => {
+      clearTimeout(toastTimeoutRef.current);
       setToast(msg);
-      setTimeout(() => setToast(''), 3000);
+      toastTimeoutRef.current = setTimeout(() => setToast(''), 3000);
   };
+
+  useEffect(() => () => clearTimeout(toastTimeoutRef.current), []);
   
   // Mantener la referencia actualizada siempre con el último estado
   useEffect(() => {
@@ -298,29 +302,34 @@ function App() {
   }, [vista, semanaPlan, grado, grupoActual]);
 
   // --- LÓGICA DE EVALUACIÓN ---
-  const cargarEval = () => { 
-      if(ipcRenderer){ 
-          ipcRenderer.invoke('get-alumnos', grupoActual?.id).then(r => setAlumnos(r || [])); 
-          ipcRenderer.invoke('get-criterios', grupoActual?.id).then(r=>{ 
-              const lista = r || []; 
-              // Generamos IDs que incluyen la materia para obligar a React a distinguir
-              const criteriosSeguros = lista.map((c, idx) => ({ 
-                  ...c, 
-                  frontId: c.id ? `db-${c.id}` : `temp-${campoActual}-${idx}` 
-              })); 
-              
-              if(criteriosSeguros.length === 0) setModoConfig(true); 
-              else setModoConfig(false);
-              
-              setCriterios(criteriosSeguros); 
-          }); 
-          ipcRenderer.invoke('get-notas-fecha', fechaEval).then(r => { const m={}; (r || []).forEach(x=>m[`${x.alumno_id}-${x.criterio_id}`]=x.valor); setNotas(m); }); 
-      } 
+  const cargaEvalRef = useRef(0);
+  const cargarEval = (fecha = fechaEval) => {
+    const grupoId = grupoActual?.id;
+    const request = ++cargaEvalRef.current;
+    if (!ipcRenderer || !grupoId) return;
+    return Promise.all([
+      ipcRenderer.invoke('get-alumnos', grupoId),
+      ipcRenderer.invoke('get-criterios', grupoId),
+      ipcRenderer.invoke('get-notas-fecha', fecha)
+    ]).then(([listaAlumnos, listaCriterios, listaNotas]) => {
+      if (request !== cargaEvalRef.current) return;
+      setAlumnos(listaAlumnos || []);
+      const lista = (listaCriterios || []).map((c, idx) => ({
+        ...c, frontId: c.id ? `db-${c.id}` : `temp-${grupoId}-${idx}`
+      }));
+      setCriterios(lista);
+      setModoConfig(lista.length === 0);
+      const mapa = {};
+      (listaNotas || []).forEach(n => { mapa[`${n.alumno_id}-${n.criterio_id}`] = n.valor; });
+      setNotas(mapa);
+    }).catch(err => {
+      console.error(err);
+      if (request === cargaEvalRef.current) showToast('❌ No se pudo cargar la evaluación.');
+    });
   };
 
-  useEffect(() => { if(vista === 'EVAL') cargarEval(); }, [grupoActual, vista]); 
-  
-  // -- MANEJO DE CONFIGURACIÓN --
+  useEffect(() => { if (vista === 'EVAL') cargarEval(); }, [grupoActual?.id, vista, fechaEval]);
+
   const handleChangeCriterio = (index, campo, valor) => {
       setCriterios(prev => prev.map((c, i) => i === index ? { ...c, [campo]: valor } : c));
   };
@@ -335,7 +344,8 @@ function App() {
   
   const handleSaveNota = useCallback((aid, cid, val) => { setNotas(prev => ({...prev, [`${aid}-${cid}`]: val})); if(cid && typeof cid === 'number') { ipcRenderer.invoke('save-nota', aid, cid, fechaEval, val).catch(console.error); } }, [fechaEval]);
   
-  const guardarConfig = () => { 
+  const guardarConfig = () => {
+      if (!grupoActual?.id) return showToast('⚠️ Selecciona un grupo antes de guardar criterios.');
       if(ipcRenderer) { 
           const prev = criteriosRef.current || [];
           const total = prev.reduce((acc, c) => acc + (parseFloat(c.porcentaje) || 0), 0); 
@@ -346,7 +356,7 @@ function App() {
           
           ipcRenderer.invoke('save-criterios', paraGuardar, grupoActual?.id).then(() => { 
               setModoConfig(false); 
-              showToast(`✅ Guardado para ${campoActual}`); 
+              showToast(`✅ Guardado para ${grupoActual.nombre_disciplina || "la materia del grupo"}`);
               cargarEval(); 
           }).catch(err => {
               showToast(`❌ Error al guardar: ${err.message || err}`);
@@ -638,6 +648,11 @@ function App() {
   if(vista === 'CONTROL_QR') {
       return (
         <div className="pantalla-dosificador">
+          {toast && (
+            <div role="status" aria-live="polite" style={{ position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', background: '#34495e', color: 'white', padding: '10px 20px', borderRadius: 20, zIndex: 10000, fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
+              {toast}
+            </div>
+          )}
           <div className="header-dosificador no-print">
             <h2>📱 Control QR</h2>
             <button className="btn-volver" onClick={() => setVista('MENU')}>Volver al Menú</button>
@@ -648,6 +663,12 @@ function App() {
             criterios={criterios}
             fechaEval={fechaEval}
             ipcRenderer={ipcRenderer}
+            nivel="secundaria"
+            onDateChanged={setFechaEval}
+            onGradesImported={({ fecha }) => {
+              setFechaEval(fecha);
+              cargarEval(fecha);
+            }}
             showToast={showToast}
             onAttendanceUpdated={() => {
               if (typeof cargarEval === 'function') cargarEval();
@@ -707,7 +728,7 @@ function App() {
               </div>
           )}
           <div className="header-dosificador" style={{ flexShrink: 0, marginBottom: '12px' }}>
-              <div style={{display:'flex', gap:15, alignItems:'center'}}><h2>📝 Evaluación ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><input type="date" value={fechaEval} onChange={e=>{setFechaEval(e.target.value); cargarEval();}} style={{fontSize:'1.1rem', padding:'5px', border:'2px solid #004aad', borderRadius:5}} /></div>
+              <div style={{display:'flex', gap:15, alignItems:'center'}}><h2>📝 Evaluación ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><input type="date" value={fechaEval} onChange={e=>setFechaEval(e.target.value)} style={{fontSize:'1.1rem', padding:'5px', border:'2px solid #004aad', borderRadius:5}} /></div>
               <div style={{display:'flex', gap:8}}>
                 <button
                   className="btn-volver"

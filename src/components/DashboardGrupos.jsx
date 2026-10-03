@@ -68,7 +68,7 @@ export default function DashboardGrupos({ onSelectGrupo }) {
   const talleres = grupos.filter(g => g.tipo === 'Taller');
 
   const renderCard = (grupo) => {
-    const disciplina = disciplinas.find(d => d.id === parseInt(grupo.disciplina_id))?.nombre || 'Desconocida';
+    const disciplina = grupo.nombre_disciplina || disciplinas.find(d => d.id === parseInt(grupo.disciplina_id))?.nombre || 'Materia del grupo';
     return (
       <div key={grupo.id} className="grupo-card" onClick={() => onSelectGrupo({...grupo, nombre_disciplina: disciplina})} style={{position: 'relative'}}>
         <button 

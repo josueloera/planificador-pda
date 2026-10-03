@@ -416,7 +416,13 @@ ipcMain.handle('get-pdas-disciplina', async (e, disciplina_id, grado) => {
 });
 
 // -- GRUPOS --
-ipcMain.handle('get-grupos', async () => new Promise(r => db.all("SELECT * FROM grupos_maestro", [], (e, rows) => r(rows || []))));
+ipcMain.handle('get-grupos', async () => {
+  const [grupos, disciplinas] = await Promise.all([
+    new Promise((resolve, reject) => db.all('SELECT * FROM grupos_maestro', [], (err, rows) => err ? reject(err) : resolve(rows || []))),
+    new Promise((resolve, reject) => universalDb.all('SELECT * FROM disciplinas', [], (err, rows) => err ? reject(err) : resolve(rows || [])))
+  ]);
+  return grupos.map(g => ({ ...g, nombre_disciplina: disciplinas.find(d => Number(d.id) === Number(g.disciplina_id))?.nombre || 'Materia del grupo' }));
+});
 ipcMain.handle('add-grupo', async (e, g) => new Promise((r, j) => db.run("INSERT INTO grupos_maestro (grado, seccion, disciplina_id, tipo, ciclo_escolar) VALUES (?, ?, ?, ?, ?)", [g.grado, g.seccion, g.disciplina_id, g.tipo, g.ciclo_escolar], function(err){ err ? j(err) : r({id: this.lastID, ...g}) })));
 ipcMain.handle('delete-grupo', async (e, id) => new Promise(r => db.run("DELETE FROM grupos_maestro WHERE id = ?", [id], () => r(true))));
 
@@ -450,41 +456,7 @@ ipcMain.handle('toggle-visto', async (e, tipo, itemId, completado) => {
 });
 
 // -- CRITERIOS --
-ipcMain.handle('get-criterios', async (e, grupo_id) => {
-  return new Promise(r => {
-    const query = "SELECT * FROM criterios WHERE grupo_id = ?";
-    db.all(query, [grupo_id], (err, rows) => r(err ? [] : rows));
-  });
-});
-
-ipcMain.handle('save-criterios', async (e, listaCriterios, grupo_id) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      try {
-        const idsConservados = listaCriterios.map(c => c.id).filter(id => id);
-        if (idsConservados.length > 0) {
-          const placeholders = idsConservados.map(() => '?').join(',');
-          db.run(`DELETE FROM criterios WHERE grupo_id = ? AND id NOT IN (${placeholders})`, [grupo_id, ...idsConservados], (err) => { if (err) reject(err); });
-        } else {
-          db.run("DELETE FROM criterios WHERE grupo_id = ?", [grupo_id], (err) => { if (err) reject(err); });
-        }
-        
-        const stmtInsert = db.prepare("INSERT INTO criterios (grupo_id, nombre, porcentaje) VALUES (?, ?, ?)");
-        const stmtUpdate = db.prepare("UPDATE criterios SET nombre = ?, porcentaje = ? WHERE id = ?");
-        
-        listaCriterios.forEach(c => {
-          if (c.id) stmtUpdate.run(c.nombre, c.porcentaje || 0, c.id, (err) => { if (err) reject(err); });
-          else stmtInsert.run(grupo_id, c.nombre, c.porcentaje || 0, (err) => { if (err) reject(err); });
-        });
-        
-        stmtInsert.finalize();
-        stmtUpdate.finalize(() => resolve(true));
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-});
+require('./evaluationQr').registerEvaluationHandlers({ ipcMain, db, variant: 'secundaria' });
 
 // -- NOTAS --
 ipcMain.handle('get-notas-fecha', async (e, fecha) => new Promise(r => db.all("SELECT * FROM notas WHERE fecha = ?", [fecha], (err, rows) => r(rows || []))));
@@ -716,8 +688,8 @@ ipcMain.handle('get-asistencia-rango', async (e, grupo_id, fechaInicio, fechaFin
   `;
   const params = [fechaInicio, fechaFin];
   if (grupo_id) {
-    sql += " AND (a.grupo_id = ? OR a.grupo_id IS NULL)";
-    params.push(grupo_id);
+    sql += " AND al.grupo_id = ? AND (a.grupo_id = ? OR a.grupo_id IS NULL)";
+    params.push(grupo_id, grupo_id);
   }
   sql += " ORDER BY a.fecha ASC, al.nombre ASC";
   db.all(sql, params, (err, rows) => r(rows || []));
@@ -736,11 +708,12 @@ ipcMain.handle('get-resumen-asistencia', async (e, grupo_id, fechaInicio, fechaF
       SUM(CASE WHEN a.estado = 'JUSTIFICADO' THEN 1 ELSE 0 END) as justificados
     FROM alumnos al
     LEFT JOIN asistencia a ON al.id = a.alumno_id AND a.fecha >= ? AND a.fecha <= ?
+      AND (a.grupo_id = ? OR a.grupo_id IS NULL)
     WHERE (al.grupo_id = ? OR ? IS NULL)
     GROUP BY al.id, al.nombre
     ORDER BY al.nombre ASC
   `;
-  db.all(sql, [fechaInicio, fechaFin, grupo_id || null, grupo_id || null], (err, rows) => {
+  db.all(sql, [fechaInicio, fechaFin, grupo_id || null, grupo_id || null, grupo_id || null], (err, rows) => {
     if (err || !rows) return r([]);
     const res = rows.map(row => {
       const tot = row.total_dias || 0;
@@ -849,184 +822,8 @@ ipcMain.handle('update-actividad-fecha', async (e, fecha, nombreViejo, nombreNue
   );
 }));
 
-// Obtener bitácora de trabajos dentro de un rango de fechas y campo formativo opcional
-ipcMain.handle('get-trabajos-rango', async (e, grupo_id, fechaInicio, fechaFin, campo) => new Promise(r => {
-  let sql = `
-    SELECT t.*, al.nombre as alumno_nombre
-    FROM trabajos_qr t
-    JOIN alumnos al ON t.alumno_id = al.id
-    WHERE t.fecha >= ? AND t.fecha <= ?
-  `;
-  const params = [fechaInicio, fechaFin];
-  if (grupo_id) {
-    sql += " AND (t.grupo_id = ? OR t.grupo_id IS NULL)";
-    params.push(grupo_id);
-  }
-  if (campo && campo !== 'TODOS') {
-    sql += " AND t.campo = ?";
-    params.push(campo);
-  }
-  sql += " ORDER BY t.fecha DESC, t.id DESC";
-  db.all(sql, params, (err, rows) => r(rows || []));
-}));
-
-// Obtener resumen y promedio de trabajos por alumno en un rango de fechas
-ipcMain.handle('get-resumen-trabajos', async (e, grupo_id, fechaInicio, fechaFin, campo) => new Promise(r => {
-  let sql = `
-    SELECT 
-      al.id as alumno_id,
-      al.nombre as alumno_nombre,
-      COUNT(t.id) as total_trabajos,
-      AVG(t.valor) as promedio
-    FROM alumnos al
-    LEFT JOIN trabajos_qr t ON al.id = t.alumno_id 
-      AND t.fecha >= ? AND t.fecha <= ?
-      ${campo && campo !== 'TODOS' ? 'AND t.campo = ?' : ''}
-    WHERE (al.grupo_id = ? OR ? IS NULL)
-    GROUP BY al.id, al.nombre
-    ORDER BY al.nombre ASC
-  `;
-  const params = [fechaInicio, fechaFin];
-  if (campo && campo !== 'TODOS') params.push(campo);
-  params.push(grupo_id || null, grupo_id || null);
-  db.all(sql, params, (err, rows) => {
-    if (err || !rows) return r([]);
-    r(rows.map(row => ({
-      alumno_id: row.alumno_id,
-      alumno_nombre: row.alumno_nombre,
-      total_trabajos: row.total_trabajos || 0,
-      promedio: row.promedio !== null && !isNaN(row.promedio) ? Number(row.promedio.toFixed(1)) : null
-    })));
-  });
-}));
-
 ipcMain.handle('delete-trabajo-qr', async (e, id) => new Promise(r => {
   db.run("DELETE FROM trabajos_qr WHERE id = ?", [id], () => r(true));
-}));
-
-// Importar promedios de trabajos por rango de fechas (o día único) hacia un criterio de evaluación
-ipcMain.handle('importar-promedios-qr-a-criterio', async (e, criterio_id, arg2, arg3, arg4, arg5, arg6) => new Promise(resolve => {
-  if (!criterio_id) return resolve(0);
-
-  const isDate = (val) => typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
-
-  let fechaInicio, fechaFin, campo, grupo_id, fechaNota;
-  if (isDate(arg2) && isDate(arg3)) {
-    fechaInicio = arg2; fechaFin = arg3; campo = arg4; grupo_id = arg5; fechaNota = arg6 || arg3;
-  } else if (isDate(arg2)) {
-    fechaInicio = arg2; fechaFin = arg2; campo = arg3; grupo_id = arg4; fechaNota = arg5 || arg2;
-  } else {
-    fechaInicio = new Date().toISOString().split('T')[0];
-    fechaFin = fechaInicio; campo = arg3 || 'TODOS'; grupo_id = arg4 || null; fechaNota = fechaFin;
-  }
-
-  const fIni = fechaInicio;
-  const fFin = fechaFin;
-  const targetFecha = fechaNota || fFin;
-  const cCampo = (campo && campo !== 'TODOS') ? String(campo).trim() : 'TODOS';
-
-  let sql = `
-    SELECT alumno_id, AVG(valor) as promedio 
-    FROM trabajos_qr 
-    WHERE fecha >= ? AND fecha <= ? 
-      AND (grupo_id = ? OR grupo_id IS NULL) 
-      ${cCampo !== 'TODOS' ? 'AND (campo = ? OR UPPER(campo) = UPPER(?))' : ''}
-    GROUP BY alumno_id
-  `;
-
-  const params = [fIni, fFin, grupo_id || null];
-  if (cCampo !== 'TODOS') params.push(cCampo, cCampo);
-
-  db.all(sql, params, (err, rows) => {
-    if (err || !rows || rows.length === 0) return resolve(0);
-    let count = 0;
-    let pending = rows.length;
-    rows.forEach(r => {
-      if (r.promedio !== null && !isNaN(r.promedio)) {
-        const val = Number(r.promedio.toFixed(1));
-        db.run("UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?", 
-          [val, r.alumno_id, criterio_id, targetFecha], function() {
-            if (this.changes === 0) {
-              db.run("INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)", 
-                [r.alumno_id, criterio_id, targetFecha, val], () => {
-                  count++; pending--;
-                  if (pending === 0) resolve(count);
-                });
-            } else {
-              count++; pending--;
-              if (pending === 0) resolve(count);
-            }
-          });
-      } else {
-        pending--;
-        if (pending === 0) resolve(count);
-      }
-    });
-  });
-}));
-
-// Importar porcentaje de asistencia hacia un criterio de evaluación (escala 0-10 o configurable)
-ipcMain.handle('importar-asistencia-a-criterio', async (e, criterio_id, arg2, arg3, arg4, arg5, arg6) => new Promise(resolve => {
-  if (!criterio_id) return resolve(0);
-
-  const isDate = (val) => typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
-
-  let fechaInicio, fechaFin, grupo_id, escalaMax, fechaNota;
-  if (isDate(arg2) && isDate(arg3)) {
-    fechaInicio = arg2; fechaFin = arg3; grupo_id = arg4; escalaMax = Number(arg5) || 10; fechaNota = arg6 || arg3;
-  } else if (isDate(arg2)) {
-    fechaInicio = arg2; fechaFin = arg2; grupo_id = arg3; escalaMax = Number(arg4) || 10; fechaNota = arg5 || arg2;
-  } else {
-    fechaInicio = new Date().toISOString().split('T')[0];
-    fechaFin = fechaInicio; grupo_id = arg3 || null; escalaMax = Number(arg4) || 10; fechaNota = fechaFin;
-  }
-
-  const targetFecha = fechaNota || fechaFin;
-
-  let sql = `
-    SELECT 
-      al.id as alumno_id,
-      COUNT(a.id) as total_dias,
-      SUM(CASE WHEN a.estado = 'PRESENTE' THEN 1 ELSE 0 END) as presentes,
-      SUM(CASE WHEN a.estado = 'RETARDO' THEN 1 ELSE 0 END) as retardos,
-      SUM(CASE WHEN a.estado = 'JUSTIFICADO' THEN 1 ELSE 0 END) as justificados
-    FROM alumnos al
-    JOIN asistencia a ON al.id = a.alumno_id
-    WHERE a.fecha >= ? AND a.fecha <= ?
-      AND (a.grupo_id = ? OR a.grupo_id IS NULL)
-    GROUP BY al.id
-  `;
-  db.all(sql, [fechaInicio, fechaFin, grupo_id || null], (err, rows) => {
-    if (err || !rows || rows.length === 0) return resolve(0);
-    let count = 0;
-    let pending = rows.length;
-    rows.forEach(r => {
-      const tot = r.total_dias || 0;
-      if (tot > 0) {
-        const pres = r.presentes || 0;
-        const ret = r.retardos || 0;
-        const just = r.justificados || 0;
-        const pct = (pres + ret * 0.5 + just * 0.8) / tot;
-        const nota = Number((pct * escalaMax).toFixed(1));
-        db.run("UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?",
-          [nota, r.alumno_id, criterio_id, targetFecha], function() {
-            if (this.changes === 0) {
-              db.run("INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)",
-                [r.alumno_id, criterio_id, targetFecha, nota], () => {
-                  count++; pending--;
-                  if (pending === 0) resolve(count);
-                });
-            } else {
-              count++; pending--;
-              if (pending === 0) resolve(count);
-            }
-          });
-      } else {
-        pending--;
-        if (pending === 0) resolve(count);
-      }
-    });
-  });
 }));
 
 // --- 11. GENERACIÓN DE MATERIALES CON IA (CLOUD TRANSPARENTE) ---

@@ -1,7 +1,7 @@
 {
   "name": "planificador-docente-secundaria",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Herramienta de Gestión Docente NEM - Secundaria",
   "author": "Josue Loera",
   "main": "electron/main.js",
@@ -41,7 +41,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.png"
+      "artifactName": "Planificador-Docente-Secundaria-Setup-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -50,18 +50,23 @@
           "arch": [
             "universal"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
         }
       ],
-      "identity": null,
-      "icon": "public/icon.png",
       "category": "public.app-category.education",
-      "x64ArchFiles": "**/*.node"
+      "artifactName": "Planificador-Docente-Secundaria-${version}-${arch}.${ext}"
     },
     "publish": [
       {
         "provider": "github",
         "owner": "josueloera",
-        "repo": "planificador-pda"
+        "repo": "planificador-pda",
+        "releaseType": "release"
       }
     ]
   },
