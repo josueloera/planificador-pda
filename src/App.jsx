@@ -8,6 +8,8 @@ import Licencia from './components/Licencia';
 import ConfiguracionCiclo from './components/ConfiguracionCiclo';
 import DashboardGrupos from './components/DashboardGrupos';
 import ControlQR from './components/ControlQR';
+import { EstadoEvaluacionQR, VincularEvaluacionQR } from './components/EvaluacionAutomatica';
+import { mezclarNotasAutomaticas, promedioPeriodo } from './evaluacionAutomatica';
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
@@ -60,11 +62,11 @@ const detectarMetodologia = (campo) => {
 // Render counter global para depuración
 window.renderCount = (window.renderCount || 0) + 1;
 
-const CeldaNota = memo(({ idAlumno, idCriterio, valorInicial, onGuardar }) => {
+const CeldaNota = memo(({ idAlumno, idCriterio, valorInicial, onGuardar, soloLectura = false }) => {
     const [valor, setValor] = useState(valorInicial ?? '');
     useEffect(() => { setValor(valorInicial ?? ''); }, [valorInicial]);
-    const handleBlur = () => { if (valor != valorInicial) onGuardar(idAlumno, idCriterio, valor === '' ? null : valor); };
-    return ( <input className="input-nota" type="text" inputMode="decimal" style={{background: 'rgba(255,255,255,0.8)', fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center', width: '100%', height: '40px', border: '1px solid #eee', borderRadius: '4px', outline: 'none', color: '#333'}} value={valor} onChange={(e) => setValor(e.target.value)} onBlur={handleBlur} placeholder="-" /> );
+    const handleBlur = () => { if (!soloLectura && valor !== valorInicial) onGuardar(idAlumno, idCriterio, valor === '' ? null : valor); };
+    return ( <input className="input-nota" readOnly={soloLectura} title={soloLectura ? "Promedio automático del ciclo escolar. Corrige los registros en Control QR." : undefined} type="text" inputMode="decimal" style={{background: 'rgba(255,255,255,0.8)', fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center', width: '100%', height: '40px', border: '1px solid #eee', borderRadius: '4px', outline: 'none', color: '#333'}} value={valor} onChange={(e) => setValor(e.target.value)} onBlur={handleBlur} placeholder="-" /> );
 });
 
 // --- HELPER ---
@@ -115,7 +117,7 @@ function App() {
   const [fechaEval, setFechaEval] = useState(new Date().toISOString().split('T')[0]);
   const [modoConfig, setModoConfig] = useState(false);
   const [showModalImportarQR, setShowModalImportarQR] = useState(false);
-  const [criterioImportarTarget, setCriterioImportarTarget] = useState('');
+  const [evaluacionAutomatica, setEvaluacionAutomatica] = useState(null);
   
   // OTROS
   const [textoPegado, setTextoPegado] = useState("");
@@ -303,6 +305,9 @@ function App() {
 
   // --- LÓGICA DE EVALUACIÓN ---
   const cargaEvalRef = useRef(0);
+  const cargaReporteRef = useRef(0);
+  const grupoEvaluacionRef = useRef(grupoActual?.id);
+  grupoEvaluacionRef.current = grupoActual?.id;
   const cargarEval = (fecha = fechaEval) => {
     const grupoId = grupoActual?.id;
     const request = ++cargaEvalRef.current;
@@ -310,25 +315,43 @@ function App() {
     return Promise.all([
       ipcRenderer.invoke('get-alumnos', grupoId),
       ipcRenderer.invoke('get-criterios', grupoId),
-      ipcRenderer.invoke('get-notas-fecha', fecha)
-    ]).then(([listaAlumnos, listaCriterios, listaNotas]) => {
-      if (request !== cargaEvalRef.current) return;
+      ipcRenderer.invoke('get-notas-fecha', fecha),
+      ipcRenderer.invoke('get-evaluacion-automatica', grupoId)
+    ]).then(([listaAlumnos, listaCriterios, listaNotas, automatica]) => {
+      if (request !== cargaEvalRef.current || grupoId !== grupoEvaluacionRef.current) return;
       setAlumnos(listaAlumnos || []);
       const lista = (listaCriterios || []).map((c, idx) => ({
         ...c, frontId: c.id ? `db-${c.id}` : `temp-${grupoId}-${idx}`
       }));
       setCriterios(lista);
       setModoConfig(lista.length === 0);
-      const mapa = {};
-      (listaNotas || []).forEach(n => { mapa[`${n.alumno_id}-${n.criterio_id}`] = n.valor; });
-      setNotas(mapa);
+      setEvaluacionAutomatica(automatica);
+      setNotas(mezclarNotasAutomaticas(listaNotas, automatica));
     }).catch(err => {
       console.error(err);
-      if (request === cargaEvalRef.current) showToast('❌ No se pudo cargar la evaluación.');
+      if (request === cargaEvalRef.current && grupoId === grupoEvaluacionRef.current) showToast('❌ No se pudo cargar la evaluación.');
     });
   };
 
-  useEffect(() => { if (vista === 'EVAL') cargarEval(); }, [grupoActual?.id, vista, fechaEval]);
+  useEffect(() => { if (vista === 'EVAL') cargarEval(); }, [grupoActual?.id, vista, fechaEval, configCiclo]);
+  useEffect(() => {
+    if (vista === 'EVAL' && !modoConfig) cargarEval();
+  }, [modoConfig]);
+
+  useEffect(() => {
+    if (!ipcRenderer) return;
+    let timer;
+    const actualizar = (_, payload = {}) => {
+      if (payload.grupo_id && payload.grupo_id !== grupoActual?.id) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (vista === 'EVAL' && !modoConfig) cargarEval();
+        if (vista === 'TRIMESTRAL') generarReporteTrimestral();
+      }, 100);
+    };
+    ipcRenderer.on('evaluacion-qr-actualizada', actualizar);
+    return () => { clearTimeout(timer); ipcRenderer.removeListener('evaluacion-qr-actualizada', actualizar); };
+  }, [grupoActual?.id, vista, fechaEval, modoConfig, trimestre, alumnos, configCiclo]);
 
   const handleChangeCriterio = (index, campo, valor) => {
       setCriterios(prev => prev.map((c, i) => i === index ? { ...c, [campo]: valor } : c));
@@ -342,7 +365,7 @@ function App() {
       setCriterios(prev => [...prev, { frontId: `new-${Date.now()}`, nombre: '', porcentaje: '' }]);
   };
   
-  const handleSaveNota = useCallback((aid, cid, val) => { setNotas(prev => ({...prev, [`${aid}-${cid}`]: val})); if(cid && typeof cid === 'number') { ipcRenderer.invoke('save-nota', aid, cid, fechaEval, val).catch(console.error); } }, [fechaEval]);
+  const handleSaveNota = useCallback((aid, cid, val) => { if (evaluacionAutomatica?.enlaces?.some(e => e.criterio_id === cid)) return; setNotas(prev => ({...prev, [`${aid}-${cid}`]: val})); if(cid && typeof cid === 'number') { ipcRenderer.invoke('save-nota', aid, cid, fechaEval, val).catch(console.error); } }, [fechaEval, evaluacionAutomatica]);
   
   const guardarConfig = () => {
       if (!grupoActual?.id) return showToast('⚠️ Selecciona un grupo antes de guardar criterios.');
@@ -366,46 +389,33 @@ function App() {
 
   // --- REPORTE TRIMESTRAL ---
   const generarReporteTrimestral = () => {
-      if (!ipcRenderer || alumnos.length === 0) return;
+      const request = ++cargaReporteRef.current;
+      if (!ipcRenderer || !grupoActual?.id || alumnos.length === 0) {
+        setResumen([]);
+        setCargandoReporte(false);
+        return;
+      }
       setCargandoReporte(true);
       const periodo = configCiclo.periodos[trimestre] || { inicio: '2026-08-31', fin: '2026-11-27' };
       if(ipcRenderer) {
-          Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin) ]).then(([todosCriterios, todasNotas]) => {
+          Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin), ipcRenderer.invoke('get-evaluacion-automatica', grupoActual?.id, { inicio: periodo.inicio, fin: periodo.fin }) ]).then(([todosCriterios, todasNotas, automatica]) => {
+          if (request !== cargaReporteRef.current) return;
           const reporte = alumnos.map(alumno => {
               const fila = { id: alumno.id, nombre: alumno.nombre };
               const criteriosAsignatura = todosCriterios || [];
-              const idsCriterios = criteriosAsignatura.map(c => c.id);
-              const notasAlumno = (todasNotas || []).filter(n => n.alumno_id === alumno.id && idsCriterios.includes(n.criterio_id));
-              const fechasUnicas = [...new Set(notasAlumno.map(n => n.fecha))];
-              
-              let sumaPromediosDiarios = 0; let diasTrabajados = 0;
-              fechasUnicas.forEach(fecha => {
-                  let sumaWeightedDia = 0;
-                  let totalPorcentajeDia = 0;
-                  criteriosAsignatura.forEach(c => {
-                      const n = notasAlumno.find(x => x.fecha === fecha && x.criterio_id === c.id);
-                      const val = n ? parseFloat(n.valor) : NaN;
-                      const peso = parseFloat(c.porcentaje) || 0;
-                      if (!isNaN(val) && peso > 0) {
-                          sumaWeightedDia += val * peso;
-                          totalPorcentajeDia += peso;
-                      }
-                  });
-                  if(totalPorcentajeDia > 0) {
-                      const promDia = sumaWeightedDia / totalPorcentajeDia;
-                      sumaPromediosDiarios += promDia;
-                      diasTrabajados++;
-                  }
-              });
-              
-              const promedioFinal = diasTrabajados > 0 ? (sumaPromediosDiarios / diasTrabajados).toFixed(1) : '-';
+              const promedio = promedioPeriodo(criteriosAsignatura, todasNotas, automatica, alumno.id);
+              const promedioFinal = promedio === null ? '-' : promedio.toFixed(1);
               fila.promedioFinal = promedioFinal;
               return fila;
           });
           setResumen(reporte); setCargandoReporte(false);
+      }).catch(err => {
+        if (request !== cargaReporteRef.current) return;
+        setCargandoReporte(false);
+        showToast(`❌ No se pudo cargar el reporte: ${err.message}`);
       });
   }};
-  useEffect(() => { if (vista === 'TRIMESTRAL') generarReporteTrimestral(); }, [vista, trimestre]);
+  useEffect(() => { if (vista === 'TRIMESTRAL') generarReporteTrimestral(); else ++cargaReporteRef.current; }, [vista, trimestre, grupoActual?.id, alumnos, configCiclo]);
 
   // --- HELPERS PROYECTOS ---
   const editarProyectoSafe = (p) => { 
@@ -568,7 +578,7 @@ function App() {
     const menuItems = [
       { id: 'GRUPO', icon: '👥', label: grupoActual ? `${grupoActual.grado}º${grupoActual.seccion} ${grupoActual.nombre_disciplina}` : 'Mi Grupo', desc: `${alumnos.length} alumnos`, color: '#6C5CE7', action: ()=>setVista('GRUPO') },
       { id: 'CONTROL_QR', icon: '📱', label: 'Control QR', desc: 'Asistencia y Escáner', color: '#00CEC9', action: ()=>setVista('CONTROL_QR') },
-      { id: 'EVAL', icon: '📝', label: 'Evaluación', desc: 'Calificaciones diarias', color: '#00B894', action: ()=>{setVista('EVAL'); cargarEval();} },
+      { id: 'EVAL', icon: '📝', label: 'Evaluación', desc: 'Calificaciones y seguimiento del ciclo', color: '#00B894', action: ()=>{setVista('EVAL'); cargarEval();} },
       { id: 'TRIMESTRAL', icon: '📊', label: 'Trimestral', desc: 'Reporte por período', color: '#E17055', action: ()=>{setVista('TRIMESTRAL'); setTrimestre(1);} },
       { id: 'PLANNER', icon: '📅', label: 'Planeación', desc: 'Secuencia semanal', color: '#0984E3', action: ()=>setVista('PLANNER') },
       { id: 'DOSIF', icon: '🚦', label: 'Dosificador', desc: 'Distribución anual', color: '#FDCB6E', action: ()=>setVista('DOSIF') },
@@ -662,6 +672,7 @@ function App() {
             alumnos={alumnos}
             criterios={criterios}
             fechaEval={fechaEval}
+            configCiclo={configCiclo}
             ipcRenderer={ipcRenderer}
             nivel="secundaria"
             onDateChanged={setFechaEval}
@@ -728,7 +739,7 @@ function App() {
               </div>
           )}
           <div className="header-dosificador" style={{ flexShrink: 0, marginBottom: '12px' }}>
-              <div style={{display:'flex', gap:15, alignItems:'center'}}><h2>📝 Evaluación ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><input type="date" value={fechaEval} onChange={e=>setFechaEval(e.target.value)} style={{fontSize:'1.1rem', padding:'5px', border:'2px solid #004aad', borderRadius:5}} /></div>
+              <div style={{display:'flex', gap:15, alignItems:'center'}}><h2>📝 Evaluación ({grupoActual?.grado}º{grupoActual?.seccion} - {grupoActual?.nombre_disciplina})</h2><label style={{fontSize: 12}}>Notas manuales: <input type="date" title="Fecha de notas manuales. Los criterios QR abarcan todo el ciclo." value={fechaEval} onChange={e=>setFechaEval(e.target.value)} style={{fontSize:'1.1rem', padding:'5px', border:'2px solid #004aad', borderRadius:5}} /></label></div>
               <div style={{display:'flex', gap:8}}>
                 <button
                   className="btn-volver"
@@ -738,70 +749,33 @@ function App() {
                       showToast('⚠️ Primero debes configurar criterios para este grupo.');
                       return;
                     }
-                    setCriterioImportarTarget(criterios[0]?.id || '');
                     setShowModalImportarQR(true);
                   }}
                 >
-                  📥 Importar desde Control QR
+                  🔗 Vincular Control QR
                 </button>
                 <button className="btn-volver" style={{background: modoConfig ? '#7f8c8d' : '#e67e22'}} onClick={()=>setModoConfig(!modoConfig)}>{modoConfig ? '↩ Volver' : '⚙️ Configurar'}</button>
                 <button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button>
               </div>
           </div>
 
-          {/* MODAL IMPORTAR DESDE CONTROL QR */}
+          <EstadoEvaluacionQR
+            automatica={evaluacionAutomatica} criterios={criterios} ipcRenderer={ipcRenderer}
+            grupoId={grupoActual?.id} onChanged={() => cargarEval()}
+            onError={message => showToast('❌ ' + message)}
+          />
           {showModalImportarQR && (
-            <div style={{position:'fixed', top:0, left:0, width:'100vw', height:'100vh', backgroundColor:'rgba(0,0,0,0.5)', zIndex:10000, display:'flex', justifyContent:'center', alignItems:'center'}}>
-              <div style={{backgroundColor:'white', borderRadius:'12px', padding:'24px', width:'450px', boxShadow:'0 8px 24px rgba(0,0,0,0.2)'}}>
-                <h3 style={{marginTop:0, color:'#004aad'}}>📥 Importar Promedios QR a Evaluador</h3>
-                <p style={{fontSize:'13px', color:'#555'}}>
-                  Importará el promedio de trabajos QR del <strong>{fechaEval}</strong> al criterio seleccionado para <strong>{grupoActual?.nombre_disciplina}</strong>.
-                </p>
-                <div style={{marginBottom:'15px'}}>
-                  <label style={{display:'block', fontWeight:'bold', marginBottom:'6px', fontSize:'13px'}}>Selecciona Criterio Destino:</label>
-                  <select
-                    value={criterioImportarTarget}
-                    onChange={(e) => setCriterioImportarTarget(e.target.value)}
-                    style={{width:'100%', padding:'10px', borderRadius:'6px', border:'1px solid #ccc', fontWeight:'bold'}}
-                  >
-                    {criterios.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre} ({c.porcentaje}%)</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginTop:'20px'}}>
-                  <button
-                    onClick={() => setShowModalImportarQR(false)}
-                    style={{padding:'8px 16px', borderRadius:'6px', border:'1px solid #ccc', background:'#f8f9fa', cursor:'pointer'}}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (!ipcRenderer || !criterioImportarTarget) return;
-                      try {
-                        const disciplina = grupoActual?.nombre_disciplina || 'TODOS';
-                        const count = await ipcRenderer.invoke('importar-promedios-qr-a-criterio', Number(criterioImportarTarget), fechaEval, fechaEval, disciplina, grupoActual?.id, fechaEval);
-                        setShowModalImportarQR(false);
-                        cargarEval();
-                        if (count > 0) {
-                          showToast(`✅ Promedios QR importados con éxito para ${count} alumnos.`);
-                        } else {
-                          showToast(`⚠️ No hay trabajos QR registrados el ${fechaEval} para esta materia.`);
-                        }
-                      } catch (err) {
-                        console.error(err);
-                        showToast(`❌ Error al importar promedios: ${err.message}`);
-                      }
-                    }}
-                    style={{padding:'8px 20px', borderRadius:'6px', border:'none', background:'#27ae60', color:'white', fontWeight:'bold', cursor:'pointer'}}
-                  >
-                    📥 Confirmar Importación
-                  </button>
-                </div>
-              </div>
-            </div>
+            <VincularEvaluacionQR key={grupoActual?.id + '-' + 'grupo'}
+              criterios={criterios} grupoId={grupoActual?.id} ipcRenderer={ipcRenderer}
+              automatica={evaluacionAutomatica} onClose={() => setShowModalImportarQR(false)}
+              onDone={async () => {
+                await cargarEval();
+                setShowModalImportarQR(false);
+                showToast('✅ Vínculo guardado. Las notas QR se actualizarán durante todo el ciclo.');
+              }}
+            />
           )}
+
           {/* En secundaria ya no mostramos pestañas de campos formativos, los criterios son de la asignatura/grupo directamente */}
           <div style={{borderTop:`5px solid ${estiloCampo.borde}`, flexGrow:1, display:'flex', flexDirection:'column', minHeight: 0, overflow: 'hidden'}}>
             
@@ -856,6 +830,7 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
                             <span style={{ fontWeight: '800', fontSize: '13px' }}>{c.nombre}</span>
                             <br/>
                             <small style={{ color: '#93c5fd', fontWeight: 'bold' }}>{c.porcentaje}%</small>
+                            {evaluacionAutomatica?.enlaces?.some(e => e.criterio_id === c.id) && <div style={{ fontSize: 11, color: '#86efac' }}>QR · ciclo completo</div>}
                           </th>
                         ))}
                         <th style={{background:'#0f172a', color:'#38bdf8', width:'90px', textAlign:'center', position: 'sticky', top: 0, zIndex: 10, fontWeight: '800'}}>HOY</th>
@@ -872,10 +847,10 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
                             </td>
                             {(criterios || []).map(c=>( 
                               <td key={c.frontId} style={{ textAlign: 'center' }}>
-                                <CeldaNota idAlumno={al.id} idCriterio={c.id} valorInicial={notas[`${al.id}-${c.id}`]} onGuardar={handleSaveNota} />
+                                <CeldaNota idAlumno={al.id} idCriterio={c.id} valorInicial={notas[`${al.id}-${c.id}`]} onGuardar={handleSaveNota} soloLectura={evaluacionAutomatica?.enlaces?.some(e => e.criterio_id === c.id)} />
                               </td> 
                             ))}
-                            <td style={{textAlign:'center', fontWeight:'800', fontSize:'1.2rem', color: '#0f172a'}}>{prom || '-'}</td>
+                            <td style={{textAlign:'center', fontWeight:'800', fontSize:'1.2rem', color: '#0f172a'}}>{prom ?? '-'}</td>
                           </tr>
                         );
                       })}
