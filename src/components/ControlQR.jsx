@@ -983,7 +983,7 @@ export default function ControlQR({
       });
       setShowModalExportAsis(false);
       notificarImportacion(criteriosAsistenciaDestino[0]);
-      if (showToast) showToast('✅ Asistencia vinculada. La evaluación se actualizará durante todo el ciclo.');
+      if (showToast) showToast('✅ Asistencia vinculada. Cada día se actualizará en su fecha durante todo el ciclo.');
     } catch (err) {
       console.error(err);
       if (showToast) showToast(`❌ No se pudo exportar la asistencia: ${err.message}`);
@@ -1006,7 +1006,7 @@ export default function ControlQR({
       });
       setShowModalExportTrab(false);
       notificarImportacion(destino);
-      if (showToast) showToast('✅ Trabajos vinculados. La evaluación se actualizará durante todo el ciclo.');
+      if (showToast) showToast('✅ Trabajos vinculados. Cada promedio diario se actualizará en su fecha.');
     } catch (err) {
       console.error(err);
       if (showToast) showToast(`❌ No se pudieron exportar los promedios: ${err.message}`);
@@ -3189,7 +3189,7 @@ export default function ControlQR({
               </label>
             )}
             <p style={{ fontSize: '12px', color: '#2d3748' }}>
-              Actualización automática durante todo el ciclo escolar.<br />
+              Actualización automática por fecha durante todo el ciclo escolar.<br />
               Destinos: {criteriosAsistenciaDestino.map(c =>
                 (esSecundaria ? camposDisponibles[0] : getNombreCampoDisplay(c.campo)) + ': ' + c.nombre).join('; ') || 'Selecciona un criterio'}.
             </p>
@@ -3237,7 +3237,7 @@ export default function ControlQR({
           <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', width: '480px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#1a365d' }}>🔗 Vincular Trabajos con Evaluación</h3>
             <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#718096' }}>
-              Vincula los trabajos de esta materia durante todo el ciclo (<strong>{ciclo.inicio} al {ciclo.fin}</strong>). Su promedio se actualizará automáticamente al registrar, corregir o eliminar un trabajo.
+              Vincula los trabajos de esta materia durante todo el ciclo (<strong>{ciclo.inicio} al {ciclo.fin}</strong>). Cada promedio diario se mostrará en su fecha y se actualizará al registrar, corregir o eliminar un trabajo.
             </p>
 
             <div style={{ marginBottom: '14px' }}>
