@@ -7,6 +7,7 @@ import GeneradorMaterial from './components/GeneradorMaterial';
 import Licencia from './components/Licencia';
 import ConfiguracionCiclo from './components/ConfiguracionCiclo';
 import DashboardGrupos from './components/DashboardGrupos';
+import Alumno from './components/Alumno';
 import ControlQR from './components/ControlQR';
 import { EstadoEvaluacionQR, VincularEvaluacionQR } from './components/EvaluacionAutomatica';
 import { mezclarNotasAutomaticas, promedioPeriodo } from './evaluacionAutomatica';
@@ -574,11 +575,13 @@ function App() {
       }} />;
     }
 
+    if (vista === 'ALUMNO') return <Alumno ipcRenderer={ipcRenderer} variante='secundaria' configCiclo={configCiclo} grupoActual={grupoActual} onVolver={()=>setVista('MENU')} />;
     if(vista === 'MENU') {
     const menuItems = [
+        { id: 'ALUMNO', icon: '👤', label: 'ALUMNO', desc: 'Perfil, calificaciones y expediente', color: '#147768', action: ()=>setVista('ALUMNO') },
       { id: 'GRUPO', icon: '👥', label: grupoActual ? `${grupoActual.grado}º${grupoActual.seccion} ${grupoActual.nombre_disciplina}` : 'Mi Grupo', desc: `${alumnos.length} alumnos`, color: '#6C5CE7', action: ()=>setVista('GRUPO') },
-      { id: 'CONTROL_QR', icon: '📱', label: 'Control QR', desc: 'Asistencia y Escáner', color: '#00CEC9', action: ()=>setVista('CONTROL_QR') },
       { id: 'EVAL', icon: '📝', label: 'Evaluación', desc: 'Calificaciones y seguimiento del ciclo', color: '#00B894', action: ()=>{setVista('EVAL'); cargarEval();} },
+      { id: 'CONTROL_QR', icon: '📱', label: 'Control QR', desc: 'Asistencia y Escáner', color: '#00CEC9', action: ()=>setVista('CONTROL_QR') },
       { id: 'TRIMESTRAL', icon: '📊', label: 'Trimestral', desc: 'Reporte por período', color: '#E17055', action: ()=>{setVista('TRIMESTRAL'); setTrimestre(1);} },
       { id: 'PLANNER', icon: '📅', label: 'Planeación', desc: 'Secuencia semanal', color: '#0984E3', action: ()=>setVista('PLANNER') },
       { id: 'DOSIF', icon: '🚦', label: 'Dosificador', desc: 'Distribución anual', color: '#FDCB6E', action: ()=>setVista('DOSIF') },
