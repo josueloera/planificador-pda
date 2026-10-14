@@ -22,17 +22,6 @@
         };
       } catch(e) {}
 
-      try {
-        const { ipcRenderer } = require('electron');
-        ipcRenderer.invoke('get-license-status').then(res => {
-          if (res && res.openaiApiKey) {
-            window.openaiApiKey = res.openaiApiKey;
-            console.log("Loaded OpenAI API Key dynamically:", res.openaiApiKey.substring(0, 8) + "...");
-          }
-        }).catch(err => console.error("Error loading license:", err));
-      } catch (e) {
-        console.error("Not in Electron environment:", e);
-      }
     </script>
   </head>
   <body>

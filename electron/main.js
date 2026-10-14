@@ -844,14 +844,15 @@ registerQrMutation('delete-trabajo-qr', async (e, id) => new Promise((resolve, r
 }));
 
 // --- 11. GENERACIÓN DE MATERIALES CON IA (CLOUD TRANSPARENTE) ---
-ipcMain.handle('generate-ai-material', async (e, { prompt, systemPrompt }) => {
+ipcMain.handle('generate-ai-material', async (e, { prompt, systemPrompt, advisor = false }) => {
   try {
     // Ensamblado dinámico por XOR en memoria: Cero cadenas base64, cero tokens reconocibles por analizadores estáticos de Mac / Apple Gatekeeper
     const _encKey = [26,78,100,51,57,39,24,60,109,84,12,48,110,124,123,3,22,125,122,75,2,47,103,38,8,109,124,52,60,92,34,35,61,39,4,30,63,110,18,10,22,116,46,43,42,80,51,25,16,42,11,3,60];
     const _maskKey = [0x5B, 0x1F, 0x4A, 0x72];
     const key = _encKey.map((c, i) => String.fromCharCode(c ^ _maskKey[i % _maskKey.length])).join('');
     const _host = ['https://generative', 'language.', 'googleapis.com'].join('');
-    const _m = ['gemini', '3.6', 'flash'].join('-');
+    const _m = ['gemini', '3.8', 'flash'].join('-');
+    if (advisor) return require('./teacherAi.cjs').generateTeacherResponse({ key, model: process.env.ELARA_GEMINI_MODEL || _m, groqKey: require('./providerCredentials.cjs').groqKey(), prompt, systemPrompt });
     const url = `${_host}/v1beta/models/${_m}:generateContent?key=${key}`;
 
     const contents = [{
