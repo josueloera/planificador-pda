@@ -41,8 +41,11 @@ jobs:
           executable=app+'/Contents/MacOS/'+info['CFBundleExecutable']
           quarantine='0083;'+format(int(time.time()),'x')+';Safari;'
           subprocess.run(['xattr','-w','com.apple.quarantine',quarantine,app],check=True)
-          opened=subprocess.run(['open','-n',app],capture_output=True,text=True,timeout=15)
-          pathlib.Path('evidence/quarantine-open.txt').write_text('exit='+str(opened.returncode)+'\n'+opened.stdout+opened.stderr)
+          try:
+            opened=subprocess.run(['open','-n',app],capture_output=True,text=True,timeout=15)
+            pathlib.Path('evidence/quarantine-open.txt').write_text('exit='+str(opened.returncode)+'\n'+opened.stdout+opened.stderr)
+          except subprocess.TimeoutExpired:
+            pathlib.Path('evidence/quarantine-open.txt').write_text('open waited for user interaction for 15 seconds; runtime test continues separately')
           time.sleep(10)
           subprocess.run(['screencapture','-x','evidence/quarantine-screen.png'],capture_output=True)
           # Only remove the synthetic quarantine on the disposable CI copy for the separate runtime test.
