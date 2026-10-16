@@ -1,4 +1,4 @@
-name: Diagnose first two macOS releases
+name: Test macOS ad hoc package repair
 on:
   workflow_dispatch:
 permissions:
@@ -9,10 +9,16 @@ jobs:
       fail-fast: false
       matrix:
         runner: [macos-14, macos-15-intel]
-        tag: [v1.0.0-build, v1.0.1]
+        tag: [v1.0.11]
+        signing: [original, adhoc]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 12
     steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
       - name: Download and mount original DMG
         env:
           GH_TOKEN: ${{ github.token }}
@@ -24,6 +30,15 @@ jobs:
           hdiutil attach download/*.dmg -readonly -nobrowse -mountpoint "$PWD/mounted"
           ditto "$PWD/mounted/Planificador Docente Secundaria.app" "$PWD/unpacked/Planificador Docente Secundaria.app"
           hdiutil detach "$PWD/mounted"
+      - name: Apply complete local signature
+        if: matrix.signing == 'adhoc'
+        shell: bash
+        run: |
+          node - <<'JS'
+          const { signAsync } = require('@electron/osx-sign');
+          signAsync({app: process.cwd() + '/unpacked/Planificador Docente Secundaria.app', identity:'-', identityValidation:false, platform:'darwin', preAutoEntitlements:false, preEmbedProvisioningProfile:false, gatekeeperAssess:false, optionsForFile:()=>({hardenedRuntime:false})}).catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+          codesign --verify --deep --strict --verbose=4 'unpacked/Planificador Docente Secundaria.app'
       - name: Inspect Gatekeeper and startup
         shell: bash
         run: |
@@ -84,5 +99,19 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: first-releases-${{ matrix.tag }}-${{ matrix.runner }}
+          name: repair-${{ matrix.signing }}-${{ matrix.runner }}
           path: evidence
+      - name: Package verified manual installer
+        if: success() && matrix.signing == 'adhoc' && matrix.runner == 'macos-14'
+        shell: bash
+        run: |
+          mkdir -p manual-installer
+          ln -s /Applications unpacked/Applications
+          codesign --verify --deep --strict 'unpacked/Planificador Docente Secundaria.app'
+          hdiutil create -volname 'Planificador Secundaria' -srcfolder unpacked -ov -format UDZO manual-installer/Planificador-Secundaria-1.0.11-firma-local-universal.dmg
+          shasum -a 256 manual-installer/*.dmg > manual-installer/SHA256.txt
+      - uses: actions/upload-artifact@v4
+        if: success() && matrix.signing == 'adhoc' && matrix.runner == 'macos-14'
+        with:
+          name: manual-mac-installer
+          path: manual-installer
