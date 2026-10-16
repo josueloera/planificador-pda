@@ -1,4 +1,4 @@
-name: Test macOS ad hoc package repair
+name: Verify assisted Mac installation
 on:
   workflow_dispatch:
 permissions:
@@ -10,7 +10,7 @@ jobs:
       matrix:
         runner: [macos-14, macos-15-intel]
         tag: [v1.0.11]
-        signing: [original, adhoc]
+        signing: [adhoc]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 12
     steps:
@@ -39,67 +39,47 @@ jobs:
           signAsync({app: process.cwd() + '/unpacked/Planificador Docente Secundaria.app', identity:'-', identityValidation:false, platform:'darwin', preAutoEntitlements:false, preEmbedProvisioningProfile:false, gatekeeperAssess:false, optionsForFile:()=>({hardenedRuntime:false})}).catch(e=>{console.error(e);process.exitCode=1;});
           JS
           codesign --verify --deep --strict --verbose=4 'unpacked/Planificador Docente Secundaria.app'
-      - name: Inspect Gatekeeper and startup
+      - name: Verify assisted installation and launch
         shell: bash
         run: |
+          cp 'scripts/mac-manual/Instalar Planificador.command' unpacked/
+          cp scripts/mac-manual/INSTRUCCIONES.txt unpacked/
+          chmod +x 'unpacked/Instalar Planificador.command'
           export APP="$PWD/unpacked/Planificador Docente Secundaria.app"
-          sw_vers > evidence/platform.txt
-          uname -m >> evidence/platform.txt
-          codesign -d --verbose=4 "$APP" > evidence/signature.txt 2>&1 || true
-          codesign --verify --deep --strict --verbose=4 "$APP" >> evidence/signature.txt 2>&1 || true
-          spctl --assess --type execute --verbose=4 "$APP" > evidence/gatekeeper.txt 2>&1 || true
-          find "$APP/Contents/Resources" -name node_sqlite3.node -exec file {} \; > evidence/sqlite.txt
           python3 - <<'PY'
-          import os,subprocess,time,json,urllib.request,pathlib,plistlib
-          app=os.environ['APP']
-          with open(app+'/Contents/Info.plist','rb') as f: info=plistlib.load(f)
-          executable=app+'/Contents/MacOS/'+info['CFBundleExecutable']
-          quarantine='0083;'+format(int(time.time()),'x')+';Safari;'
-          subprocess.run(['xattr','-w','com.apple.quarantine',quarantine,app],check=True)
-          try:
-            opened=subprocess.run(['open','-n',app],capture_output=True,text=True,timeout=15)
-            pathlib.Path('evidence/quarantine-open.txt').write_text('exit='+str(opened.returncode)+'\n'+opened.stdout+opened.stderr)
-          except subprocess.TimeoutExpired:
-            pathlib.Path('evidence/quarantine-open.txt').write_text('open waited for user interaction for 15 seconds; runtime test continues separately')
-          time.sleep(10)
-          subprocess.run(['screencapture','-x','evidence/quarantine-screen.png'],capture_output=True)
-          # Only remove the synthetic quarantine on the disposable CI copy for the separate runtime test.
-          subprocess.run(['xattr','-d','com.apple.quarantine',app],capture_output=True)
-          env=dict(os.environ,ELECTRON_RUN_AS_NODE='1')
-          arch='arm64' if os.uname().machine=='arm64' else 'x64'
-          base=pathlib.Path(app+'/Contents/Resources')
-          candidates=[base/('app-'+arch)/'node_modules/sqlite3',base/'app/node_modules/sqlite3',base/'app.asar/node_modules/sqlite3']
-          sqlite=next((p for p in candidates if p.exists()),candidates[-1])
-          try:
-            check=subprocess.run([executable,'-e','const s=require(process.argv[1]); const db=new s.Database(":memory:"); db.get("select 1 as ok",(e,r)=>{console.log(e||r);db.close();if(e)process.exitCode=1;});',str(sqlite)],env=env,capture_output=True,text=True,timeout=40)
-            code=check.returncode
-            pathlib.Path('evidence/sqlite-runtime.txt').write_text('exit='+str(code)+'\n'+check.stdout+check.stderr)
-          except Exception as e:
-            code=-999;pathlib.Path('evidence/sqlite-runtime.txt').write_text(str(e))
-          with open('evidence/startup.txt','w') as log:
-            child=subprocess.Popen([executable,'--remote-debugging-port=9229','--enable-logging=stderr'],stdout=log,stderr=subprocess.STDOUT)
-            targets=[]
-            for _ in range(30):
-              if child.poll() is not None:break
-              try:
-                with urllib.request.urlopen('http://127.0.0.1:9229/json/list',timeout=1) as response:targets=json.load(response)
-              except Exception:pass
-              time.sleep(1)
-            result={'version':info.get('CFBundleShortVersionString'),'architecture':arch,'sqliteExit':code,'processExit':child.poll(),'targets':targets}
-            pathlib.Path('evidence/result.json').write_text(json.dumps(result,indent=2))
-            subprocess.run(['screencapture','-x','evidence/screen.png'],capture_output=True)
-            if child.poll() is None:
-              child.terminate()
-              try:child.wait(timeout=10)
-              except subprocess.TimeoutExpired:child.kill();child.wait()
-          print(json.dumps(result,indent=2))
-          if code or not any(t.get('type')=='page' and t.get('url','').startswith('file:') for t in targets):raise SystemExit('Startup check failed; inspect evidence')
+          import os,subprocess,pathlib,time,json,urllib.request
+          source=os.environ['APP']; root=pathlib.Path.home()/'Applications'; dest=root/'Planificador Docente Secundaria.app'
+          dest.mkdir(parents=True);(dest/'old-version.txt').write_text('preserve old app')
+          data=pathlib.Path.home()/'Library/Application Support/planificador-docente-secundaria'
+          data.mkdir(parents=True,exist_ok=True);sentinel=data/'preservation-test.txt';sentinel.write_text('preserve user data')
+          subprocess.run(['xattr','-w','com.apple.quarantine','0083;'+format(int(time.time()),'x')+';Safari;',source],check=True)
+          with open('evidence/installation.txt','w') as log:
+            result=subprocess.run(['bash','unpacked/Instalar Planificador.command'],env=dict(os.environ,PLANIFICADOR_TEST='1'),stdout=log,stderr=subprocess.STDOUT,timeout=60)
+          assert result.returncode==0,'Installer failed'
+          targets=[]
+          for _ in range(30):
+            try:
+              with urllib.request.urlopen('http://127.0.0.1:9229/json/list',timeout=1) as response:targets=json.load(response)
+            except Exception:pass
+            time.sleep(1)
+          backup=any((p/'old-version.txt').read_text()=='preserve old app' for p in root.glob('Planificador Docente Secundaria-respaldo-*.app'))
+          preserved=sentinel.read_text()=='preserve user data'
+          valid=subprocess.run(['codesign','--verify','--deep','--strict',str(dest)],capture_output=True,text=True)
+          quarantine=subprocess.run(['xattr','-p','com.apple.quarantine',str(dest)],capture_output=True,text=True)
+          sourceq=subprocess.run(['xattr','-p','com.apple.quarantine',source],capture_output=True,text=True)
+          pages=[t for t in targets if t.get('type')=='page' and '/Applications/Planificador' in t.get('url','')]
+          report={'arch':os.uname().machine,'launchMethod':'LaunchServices open from installer','installerExit':result.returncode,'validSignature':valid.returncode==0,'previousAppPreserved':backup,'userDataPreserved':preserved,'installedQuarantineRemoved':quarantine.returncode!=0,'sourceQuarantinePreserved':sourceq.returncode==0,'targets':targets}
+          pathlib.Path('evidence/result.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+          subprocess.run(['screencapture','-x','evidence/screen.png'],capture_output=True)
+          assert pages and backup and preserved and valid.returncode==0 and quarantine.returncode!=0 and sourceq.returncode==0,'Installation or launch verification failed'
+          # Do not carry the synthetic test attribute into the distributable image.
+          subprocess.run(['xattr','-d','com.apple.quarantine',source],check=True)
           PY
       - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: repair-${{ matrix.signing }}-${{ matrix.runner }}
+          name: assisted-install-${{ matrix.runner }}
           path: evidence
       - name: Package verified manual installer
         if: success() && matrix.signing == 'adhoc' && matrix.runner == 'macos-14'
@@ -108,7 +88,7 @@ jobs:
           mkdir -p manual-installer
           ln -s /Applications unpacked/Applications
           codesign --verify --deep --strict 'unpacked/Planificador Docente Secundaria.app'
-          hdiutil create -volname 'Planificador Secundaria' -srcfolder unpacked -ov -format UDZO manual-installer/Planificador-Secundaria-1.0.11-firma-local-universal.dmg
+          hdiutil create -volname 'Planificador Secundaria' -srcfolder unpacked -ov -format UDZO manual-installer/Planificador-Secundaria-1.0.11-instalacion-asistida-universal.dmg
           shasum -a 256 manual-installer/*.dmg > manual-installer/SHA256.txt
       - uses: actions/upload-artifact@v4
         if: success() && matrix.signing == 'adhoc' && matrix.runner == 'macos-14'
