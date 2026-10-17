@@ -1,3 +1,4 @@
+import ExportDocument from './ExportDocument';
 import AdecuacionesQR from './AdecuacionesQR';
 import { actividadAsignada } from '../qrAssignments';
 import { rangoDelCiclo } from '../evaluacionAutomatica';
@@ -139,7 +140,7 @@ export default function ControlQR({
 
   // Recuperar tanto el foco de Electron como el del campo al abrir el formulario.
   useEffect(() => {
-    if (!editandoNombreActividad || activeTab !== 'ESCANER' || modoEscaneo !== 'TRABAJO') return;
+    if (!editandoNombreActividad || activeTab !== 'ESCANER' || modoEscaneo === 'ASISTENCIA') return;
     let vigente = true;
     const enfocar = async () => {
       try {
@@ -241,6 +242,7 @@ export default function ControlQR({
   const [showModalExportTrab, setShowModalExportTrab] = useState(false);
   const [criterioDestinoAsis, setCriterioDestinoAsis] = useState('');
   const [criterioDestinoTrab, setCriterioDestinoTrab] = useState('');
+  const [tipoVinculoTrab, setTipoVinculoTrab] = useState('trabajos');
   const [campoDestinoAsis, setCampoDestinoAsis] = useState('TODOS');
   const [escalaDestinoAsis, setEscalaDestinoAsis] = useState(10);
   const [criteriosGrupo, setCriteriosGrupo] = useState([]);
@@ -378,18 +380,28 @@ export default function ControlQR({
     return Array.from(map.values());
   }, [trabajosDia, actividadesCreadas, tituloTrabajo, campoSeleccionado, esSecundaria, camposDisponibles, asignacionesDia]);
 
+  const actividadesCaptura = useMemo(() => actividadesDelDia.filter(a => (a.categoria || 'TRABAJO') === (modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO')), [actividadesDelDia, modoEscaneo]);
+  useEffect(() => {
+    setCreandoNuevaActividad(false); setEditandoActividad(null);
+    const primera = actividadesCaptura[0];
+    setTituloTrabajo(actual => actividadesCaptura.some(a => a.nombre === actual) ? actual : primera?.nombre || '');
+    if (primera?.campo) setCampoSeleccionado(primera.campo);
+  }, [modoEscaneo]);
+
   const tareaAplica = (nombre, id) => actividadAsignada(actividadesDelDia.find(a => a.nombre === nombre), id);
   const crearActividadGeneral = async (nombre, campo) => {
     const ids = fechaActualQR >= ciclo.inicio && fechaActualQR <= ciclo.fin
       ? await ipcRenderer.invoke('get-qr-adecuaciones', grupoActual.id, ciclo.inicio, ciclo.fin, campo) : [];
     return ipcRenderer.invoke('save-qr-actividad', grupoActual.id, fechaActualQR, {
-      nombre, campo, modo: 'GENERAL', alumno_ids: alumnos.filter(a => !ids.includes(a.id)).map(a => a.id)
+      nombre, campo, categoria: modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO', modo: 'GENERAL', alumno_ids: alumnos.filter(a => !ids.includes(a.id)).map(a => a.id)
     });
   };
   const asegurarActividad = async (nombre, campo) => {
     if (!asignacionesListas) throw new Error('Espera a que carguen las actividades del grupo.');
     const current = scope;
     let act = actividadesDelDia.find(a => a.nombre === nombre);
+    if (act && (act.categoria || 'TRABAJO') !== (modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO')) throw new Error('Selecciona una actividad del apartado actual.');
+    if (!nombre?.trim()) throw new Error('Crea o selecciona una actividad antes de calificar.');
     if (!act) {
       act = await crearActividadGeneral(nombre, campo);
       if (scopeRef.current === current) await cargarAsignaciones();
@@ -400,16 +412,16 @@ export default function ControlQR({
 
   // Nombres de tareas disponibles (mantiene compatibilidad total con Matriz y componentes existentes)
   const tareasDisponibles = useMemo(() => {
-    return actividadesDelDia.map(a => a.nombre);
-  }, [actividadesDelDia]);
+    return actividadesCaptura.map(a => a.nombre);
+  }, [actividadesCaptura]);
 
   // Sincronizar tarea activa y su materia al cambiar de fecha o actividades
   useEffect(() => {
-    if (actividadesDelDia.length > 0) {
-      const existe = actividadesDelDia.find(a => a.nombre === tituloTrabajo);
+    if (actividadesCaptura.length > 0) {
+      const existe = actividadesCaptura.find(a => a.nombre === tituloTrabajo);
       if (!existe) {
-        setTituloTrabajo(actividadesDelDia[0].nombre);
-        setCampoSeleccionado(actividadesDelDia[0].campo || camposDisponibles[0]);
+        setTituloTrabajo(actividadesCaptura[0].nombre);
+        setCampoSeleccionado(actividadesCaptura[0].campo || camposDisponibles[0]);
       } else {
         if (existe.campo && existe.campo !== campoSeleccionado) {
           setCampoSeleccionado(existe.campo);
@@ -454,7 +466,7 @@ export default function ControlQR({
   // Abrir formulario para crear una nueva actividad con nombre y materia
   const abrirCreadorActividad = () => {
     const num = actividadesDelDia.length + 1;
-    setNuevoNombreActividad(`Tarea ${num}`);
+    setNuevoNombreActividad(`${modoEscaneo === 'TAREA' ? 'Tarea' : 'Actividad'} ${num}`);
     setNuevoCampoActividad(campoSeleccionado || camposDisponibles[0]);
     setNuevoTipoActividad('GENERAL');
     setCreandoNuevaActividad(true);
@@ -475,7 +487,11 @@ export default function ControlQR({
         if (cargandoAlumnosAdecuacion) throw new Error('Espera a que termine la carga de alumnos NEE.');
         if (!alumnoIds.length) throw new Error('Selecciona al menos un alumno NEE para esta actividad.');
         await ipcRenderer.invoke('save-qr-actividad', grupoActual.id, fechaActualQR, {
-          nombre: nomTrim, campo: nuevoCampoActividad, modo: 'ADAPTADA', alumno_ids: alumnoIds
+          nombre: nomTrim, campo: nuevoCampoActividad, categoria: modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO', modo: 'ADAPTADA', alumno_ids: alumnoIds
+        });
+      } else if (nuevoTipoActividad === 'TODOS') {
+        await ipcRenderer.invoke('save-qr-actividad', grupoActual.id, fechaActualQR, {
+          nombre: nomTrim, campo: nuevoCampoActividad, categoria: modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO', modo: 'TODOS', alumno_ids: alumnos.map(a => a.id)
         });
       } else {
         await crearActividadGeneral(nomTrim, nuevoCampoActividad);
@@ -789,8 +805,8 @@ export default function ControlQR({
     [criteriosGrupo, esSecundaria, campoFiltroHistorial]);
   useEffect(() => {
     if (showModalExportTrab) setCriterioDestinoTrab(prev => criteriosFiltradosTrab.some(c => String(c.id) === prev)
-      ? prev : String(criteriosFiltradosTrab.find(c => /trabaj|tarea/i.test(c.nombre))?.id || ''));
-  }, [showModalExportTrab, criteriosFiltradosTrab]);
+      ? prev : String(criteriosFiltradosTrab.find(c => (tipoVinculoTrab === 'tareas' ? /tarea/i : /trabaj|activid/i).test(c.nombre))?.id || ''));
+  }, [showModalExportTrab, criteriosFiltradosTrab, tipoVinculoTrab]);
 
   const criteriosFiltradosAsis = useMemo(() => criteriosGrupo.filter(c => esSecundaria ||
     campoDestinoAsis === 'TODOS' || normalizarCampo(c.campo) === normalizarCampo(campoDestinoAsis)),
@@ -1083,7 +1099,7 @@ export default function ControlQR({
     setExportando(true);
     try {
       await ipcRenderer.invoke('configurar-evaluacion-automatica', {
-        grupo_id: grupoActual.id, tipo: 'trabajos', criterio_ids: [destino.id], escala: 10
+        grupo_id: grupoActual.id, tipo: tipoVinculoTrab, criterio_ids: [destino.id], escala: 10
       });
       setShowModalExportTrab(false);
       notificarImportacion(destino);
@@ -1110,7 +1126,7 @@ export default function ControlQR({
     : '-';
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'system-ui, sans-serif', color: '#2d3748' }}>
+    <div data-document="qr" style={{ padding: '20px', fontFamily: 'system-ui, sans-serif', color: '#2d3748' }}>
       {/* ESTILOS DE IMPRESIÓN PARA GAFETES */}
       <style>{`
         @media print {
@@ -1130,6 +1146,7 @@ export default function ControlQR({
         }
       `}</style>
 
+      {activeTab !== 'ESCANER' && <ExportDocument title={`${activeTab === 'GAFETES' ? 'Gafetes' : 'Control QR - ' + activeTab} - ${grupoActual?.grado || ''} ${grupoActual?.seccion || ''} - ${fechaActualQR}`} selector={activeTab === 'GAFETES' ? '.gafetes-print-grid' : '[data-document="qr"]'} table={activeTab !== 'GAFETES'} />}
       {/* HEADER PRINCIPAL DE CONTROL QR */}
       <div className="no-print" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '14px', backgroundColor: '#ffffff', padding: '16px 24px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', marginBottom: '20px' }}>
         <div>
@@ -1218,7 +1235,7 @@ export default function ControlQR({
         <AdecuacionesQR key={scope} alumnos={alumnos} campos={camposDisponibles} fecha={fechaActualQR}
           ciclo={ciclo} grupoId={grupoActual.id} ipcRenderer={ipcRenderer} actividades={actividadesDelDia}
           onSaved={cargarAsignaciones} showToast={showToast}
-          onSelect={(act, calificar) => { seleccionarActividad(act); if (calificar) { setModoEscaneo('TRABAJO'); setActiveTab('ESCANER'); } }} />
+          onSelect={(act, calificar) => { seleccionarActividad(act); if (calificar) { setModoEscaneo(act.categoria === 'TAREA' ? 'TAREA' : 'TRABAJO'); setActiveTab('ESCANER'); } }} />
       )}
 
       {/* VISTA 1: ESCÁNER Y VINCULACIÓN MÓVIL */}
@@ -1260,6 +1277,7 @@ export default function ControlQR({
               >
                 📝 Revisión de Trabajos
               </button>
+              <button type="button" onClick={() => setModoEscaneo('TAREA')} style={{ flex: 1, padding: 12, borderRadius: 8, border: 0, fontWeight: 700, background: modoEscaneo === 'TAREA' ? '#6b46c1' : '#edf2f7', color: modoEscaneo === 'TAREA' ? 'white' : '#4a5568' }}>📚 Tareas</button>
             </div>
 
             {/* OPCIONES DE ASISTENCIA */}
@@ -1298,21 +1316,22 @@ export default function ControlQR({
             )}
 
             {/* OPCIONES DE EVALUACIÓN DE TRABAJO */}
-            {modoEscaneo === 'TRABAJO' && (() => {
-              const actActivaObj = actividadesDelDia.find(a => a.nombre === tituloTrabajo);
+            {modoEscaneo !== 'ASISTENCIA' && (() => {
+              const actActivaObj = actividadesCaptura.find(a => a.nombre === tituloTrabajo);
               const campoActivoInfo = getInfoCampo(actActivaObj?.campo || campoSeleccionado);
               const entregasActivas = (trabajosDia || []).filter(t => t.nombre_trabajo === tituloTrabajo).length;
 
               return (
                 <div style={{ backgroundColor: '#fffaf0', padding: '16px', borderRadius: '12px', border: '1px solid #feebc8', marginBottom: '20px', boxShadow: '0 2px 6px rgba(221, 107, 32, 0.08)' }}>
                   
+                  {modoEscaneo === 'TAREA' && <button type="button" onClick={() => { setTipoVinculoTrab('tareas'); setCriterioDestinoTrab(''); setShowModalExportTrab(true); }} style={{ padding: 10, marginBottom: 12 }}>Vincular Tareas al evaluador</button>}
                   {/* BARRA SUPERIOR: RESUMEN DE ACTIVIDAD ACTIVA Y ACCIONES */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                     
                     {/* Indicador de Tarea Activa */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#744210' }}>
-                        🎯 Tarea Activa al Escanear:
+                        {modoEscaneo === 'TAREA' ? '📚 Tarea activa:' : '🎯 Actividad activa:'}
                       </span>
                       <div style={{
                         display: 'inline-flex',
@@ -1429,7 +1448,8 @@ export default function ControlQR({
                       <div role="tablist" aria-label="Destinatarios de la actividad" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '12px 0' }}>
                         {[
                           { id: 'GENERAL', label: '👥 Clase en general' },
-                          { id: 'NEE', label: '🧩 Alumnos NEE' }
+                          { id: 'NEE', label: '🧩 Alumnos NEE' },
+                          { id: 'TODOS', label: '👥 Ambos: general y NEE' }
                         ].map(tab => (
                           <button key={tab.id} type="button" role="tab" aria-selected={nuevoTipoActividad === tab.id}
                             onClick={() => setNuevoTipoActividad(tab.id)}
@@ -1453,7 +1473,7 @@ export default function ControlQR({
                             </div>
                           ) : <p style={{ margin: 0 }}>Todavía no hay alumnos marcados. Agrégalos en Adecuaciones curriculares.</p>}
                         </fieldset>
-                      ) : <p style={{ margin: '0 0 12px', color: '#52687d', fontSize: 12 }}>La actividad se asignará al grupo general según la configuración de adecuaciones de esta materia.</p>}
+                      ) : <p style={{ margin: '0 0 12px', color: '#52687d', fontSize: 12 }}>{nuevoTipoActividad === 'TODOS' ? 'Una misma actividad para todo el grupo, incluidos los alumnos NEE.' : 'La actividad se asignará al grupo general, sin los alumnos marcados con adecuaciones.'}</p>}
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '10px', alignItems: 'end' }}>
                         <div>
@@ -1678,12 +1698,12 @@ export default function ControlQR({
                         <span>⚡ Actividades de Hoy (1 clic para cambiar de tarea y materia):</span>
                       </label>
                       <span style={{ fontSize: '11px', color: '#78350f', fontWeight: 'bold' }}>
-                        {actividadesDelDia.length} {actividadesDelDia.length === 1 ? 'actividad' : 'actividades'}
+                        {actividadesCaptura.length} {actividadesDelDia.length === 1 ? 'actividad' : 'actividades'}
                       </span>
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'stretch' }}>
-                      {actividadesDelDia.map(act => {
+                      {actividadesCaptura.map(act => {
                         const isActiva = act.nombre === tituloTrabajo;
                         const campoInfo = getInfoCampo(act.campo);
                         const entregas = (trabajosDia || []).filter(t => t.nombre_trabajo === act.nombre).length;
@@ -1909,7 +1929,7 @@ export default function ControlQR({
                   </div>
 
                   {/* DESGLOSE DE TAREAS ENTREGADAS HOY POR ESTE ALUMNO */}
-                  {modoEscaneo === 'TRABAJO' && aluActual && (
+                  {modoEscaneo !== 'ASISTENCIA' && aluActual && (
                     <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #bee3f8' }}>
                       <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2b6cb0', marginBottom: '6px' }}>
                         📋 Tareas registradas hoy para este alumno ({trabajosEsteAlumno.length}):
@@ -2620,7 +2640,7 @@ export default function ControlQR({
                     📥 Descargar Excel de Trabajos (.xls)
                   </button>
                   <button
-                    onClick={() => setShowModalExportTrab(true)}
+                    onClick={() => { setTipoVinculoTrab('trabajos'); setCriterioDestinoTrab(''); setShowModalExportTrab(true); }}
                     disabled={!grupoActual?.id || !ciclo.inicio || !ciclo.fin}
                     style={{
                       padding: '10px 18px',
@@ -3189,6 +3209,9 @@ export default function ControlQR({
                 <div
                   key={a.id}
                   className="gafete-card"
+                  data-badge-name={a.nombre}
+                  data-badge-id={`ALU-${a.id}`}
+                  data-badge-group={grupoActual ? `${grupoActual.grado}° Grado Grupo "${grupoActual.seccion}"` : 'Educación Básica'}
                   style={{
                     backgroundColor: '#ffffff',
                     border: '2px solid #2b6cb0',
@@ -3373,7 +3396,7 @@ export default function ControlQR({
           <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', width: '480px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#1a365d' }}>🔗 Vincular Trabajos con Evaluación</h3>
             <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#718096' }}>
-              Vincula los trabajos de esta materia durante todo el ciclo (<strong>{ciclo.inicio} al {ciclo.fin}</strong>). Cada promedio diario se mostrará en su fecha y se actualizará al registrar, corregir o eliminar un trabajo.
+              Vincula {tipoVinculoTrab === 'tareas' ? 'las tareas' : 'los trabajos de clase'} de esta materia durante todo el ciclo (<strong>{ciclo.inicio} al {ciclo.fin}</strong>). Cada promedio diario se mostrará en su fecha y se actualizará al registrar, corregir o eliminar un trabajo.
             </p>
 
             <div style={{ marginBottom: '14px' }}>
@@ -3394,6 +3417,7 @@ export default function ControlQR({
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>
                 Selecciona el Criterio de Destino:
               </label>
+              <select aria-label="Registros del criterio" value={tipoVinculoTrab} onChange={e => { setTipoVinculoTrab(e.target.value); setCriterioDestinoTrab(''); }}><option value="trabajos">Trabajos de clase</option><option value="tareas">Tareas</option></select>
               <select
                 value={criterioDestinoTrab}
                 onChange={e => setCriterioDestinoTrab(e.target.value)}

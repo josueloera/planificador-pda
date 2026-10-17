@@ -1,3 +1,4 @@
+import ExportDocument from './ExportDocument';
 
 // Generador local de respaldo para la Nueva Escuela Mexicana (NEM) cuando no hay API Key o falla la red
 function generarMaterialLocal(tipoMaterial, tema, grado, cantidadReactivos) {
@@ -386,7 +387,7 @@ const GeneradorMaterial = ({ onVolver, pdasDisponibles = [], grado }) => {
                 {resultado.origen === 'IA' ? '🌐 Inteligencia Artificial (Nube)' : '⚡ Modo Offline SEP'}
               </span>
             </div>
-            <button onClick={imprimirMaterial} style={{ padding: '10px 20px', background: '#34495e', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>🖨️ Imprimir / Guardar PDF</button>
+            <ExportDocument title="Material didáctico" selector=".print-area" /><button onClick={imprimirMaterial} style={{ padding: '10px 20px', background: '#34495e', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>🖨️ Imprimir / Guardar PDF</button>
           </div>
           
           <hr style={{ margin: '20px 0' }} className="no-print" />
