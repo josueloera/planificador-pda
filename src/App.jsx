@@ -74,7 +74,7 @@ const CeldaNota = memo(({ idAlumno, idCriterio, valorInicial, onGuardar, soloLec
 });
 
 // --- HELPER ---
-const safeParse = (data, fallback) => { if (typeof data === 'object' && data !== null) return data; try { return JSON.parse(data); } catch (e) { return fallback; } };
+const safeParse = (data, fallback) => { if (typeof data === 'object' && data !== null) return data; try { return JSON.parse(data) ?? fallback; } catch (e) { return fallback; } };
 
 const SEMANAS_CLASE = Array.from({length: 42}, (_, i) => ({ id: i + 1, rango: `Semana ${i + 1}` }));
 const TIPOS_EVENTO = { 
