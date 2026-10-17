@@ -185,6 +185,9 @@ db.serialize(() => {
   });
 });
 
+// Shared with get-ws-info so the pairing QR uses the listening port.
+let activeWsPort = 3000;
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
@@ -202,7 +205,6 @@ function createWindow() {
   });
 
   // Configurar servidor WebSocket para sincronización con App Móvil
-  let activeWsPort = 3000;
   function startWsServer(portToTry = 3000) {
     try {
       const wss = new WebSocketServer({ port: portToTry, host: '0.0.0.0' });

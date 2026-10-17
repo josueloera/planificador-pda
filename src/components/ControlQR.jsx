@@ -1875,9 +1875,9 @@ export default function ControlQR({
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '15px', textAlign: 'center' }}>
               <h4 style={{ margin: '0 0 10px 0', color: '#4a5568' }}>📲 Conectar Celular / App Móvil</h4>
               <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#718096' }}>
-                Abre la aplicación móvil de escaneo en tu Android o iOS y escanea este código para sincronizar:
+                Abre la aplicación móvil de escaneo en tu celular y escanea este código para sincronizar:
               </p>
-              
+
               <div style={{ display: 'inline-block', padding: '10px', backgroundColor: '#ffffff', border: '2px solid #e2e8f0', borderRadius: '10px' }}>
                 <QRCodeSVG value={wsUrl} size={150} />
               </div>
@@ -1888,9 +1888,9 @@ export default function ControlQR({
               <div style={{ backgroundColor: '#fffaf0', padding: '12px 14px', borderRadius: '8px', border: '1px solid #feebc8', textAlign: 'left', fontSize: '12px', color: '#744210', marginTop: '10px' }}>
                 <strong>⚠️ Si la App APK no conecta:</strong>
                 <ol style={{ margin: '6px 0 0 0', paddingLeft: '16px', lineHeight: '1.4' }}>
-                  <li>Asegúrate de que la PC y el Celular estén en el <strong>mismo Wi-Fi</strong>.</li>
+                  <li>Asegúrate de que la computadora y el celular estén en el <strong>mismo Wi-Fi</strong>.</li>
                   <li>Si cambiaste de red, abre el escáner de la app e ingresa la IP: <strong style={{ background: '#fbd38d', padding: '1px 5px', borderRadius: '3px' }}>{localIp}</strong> y puerto: <strong style={{ background: '#fbd38d', padding: '1px 5px', borderRadius: '3px' }}>{wsPort}</strong>.</li>
-                  <li>Si tu Windows Firewall bloquea la conexión, asegúrate de permitir el acceso a redes Privadas.</li>
+                  <li>Si el firewall bloquea la conexión, permite Planificador Docente en redes privadas de Windows o en el firewall de macOS.</li>
                 </ol>
               </div>
             </div>
