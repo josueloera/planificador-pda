@@ -23,8 +23,8 @@ export default function AdecuacionesQR({ alumnos, campos, fecha, ciclo, grupoId,
     }).catch(e => { if (active) setError(e.message); });
     return () => { active = false; };
   }, [ipcRenderer, grupoId, campo, ciclo.inicio, ciclo.fin, fecha]);
-  const toggle = (ids, id) => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
-  const defaults = type => alumnos.filter(a => type === 'TODOS' || (type === 'ADAPTADA' ? marcados.includes(a.id) : !marcados.includes(a.id))).map(a => a.id);
+  const toggle = (ids, id) => ids.some(x => String(x) === String(id)) ? ids.filter(x => String(x) !== String(id)) : [...ids, id];
+  const defaults = type => alumnos.filter(a => type === 'TODOS' || (type === 'ADAPTADA' ? marcados.some(id => String(id) === String(a.id)) : !marcados.some(id => String(id) === String(a.id)))).map(a => a.id);
   const execute = async work => {
     setBusy(true); setError('');
     try { await work(); } catch (e) { setError(e.message); } finally { setBusy(false); }
@@ -38,7 +38,7 @@ export default function AdecuacionesQR({ alumnos, campos, fecha, ciclo, grupoId,
     <fieldset disabled={busy || !ready} style={box}>
       <legend><strong>1. Alumnos con adecuaciones curriculares</strong></legend>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-        {alumnos.map(a => <label key={a.id}><input type="checkbox" checked={marcados.includes(a.id)} onChange={() => setMarcados(toggle(marcados, a.id))} /> {a.nombre}</label>)}
+        {alumnos.map(a => <label key={a.id}><input type="checkbox" checked={marcados.some(id => String(id) === String(a.id))} onChange={() => setMarcados(toggle(marcados, a.id))} /> {a.nombre}</label>)}
       </div>
       <p>Esta selección se usa para las nuevas tareas de esta materia. Las actividades anteriores conservan sus destinatarios; puedes editarlos abajo.</p>
       <button style={button} onClick={() => execute(async () => {

@@ -74,6 +74,19 @@ for (const variant of ['primaria','secundaria']) {
   });
 }
 
+
+for (const variant of ['primaria','secundaria']) {
+  test(`${variant}: respalda perfiles NEE antiguos con identificadores de texto`, async t => {
+    const f=await fixture(t,variant);
+    await f.run(`INSERT INTO configuracion VALUES (?,?)`,[`qr_adecuaciones:1:2026-08-31:2027-07-16:${variant==='secundaria'?'MATERIA':'LENGUAJES'}`,JSON.stringify(['2'])]);
+    const ids=await f.invoke('get-qr-adecuaciones',1,'2026-08-31','2027-07-16','LENGUAJES');
+    assert.deepEqual(ids,[2]);
+    await f.save('Apoyo NEE','ADAPTADA',['2']);
+    await f.work(2,'Apoyo NEE',8);
+    await assert.rejects(f.work(1,'Apoyo NEE'),/no est.*asignada/);
+  });
+}
+
 test('Excel incluye actividades sin entregas, No aplica y denominadores individuales', async () => {
   const path = require('node:path');
   const helperSource = fs.readFileSync(path.join(__dirname,'../src/qrAssignments.js')).toString('base64');

@@ -393,7 +393,7 @@ export default function ControlQR({
     const ids = fechaActualQR >= ciclo.inicio && fechaActualQR <= ciclo.fin
       ? await ipcRenderer.invoke('get-qr-adecuaciones', grupoActual.id, ciclo.inicio, ciclo.fin, campo) : [];
     return ipcRenderer.invoke('save-qr-actividad', grupoActual.id, fechaActualQR, {
-      nombre, campo, categoria: modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO', modo: 'GENERAL', alumno_ids: alumnos.filter(a => !ids.includes(a.id)).map(a => a.id)
+      nombre, campo, categoria: modoEscaneo === 'TAREA' ? 'TAREA' : 'TRABAJO', modo: 'GENERAL', alumno_ids: alumnos.filter(a => !ids.some(id => String(id) === String(a.id))).map(a => a.id)
     });
   };
   const asegurarActividad = async (nombre, campo) => {

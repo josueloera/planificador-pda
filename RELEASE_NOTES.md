@@ -8,6 +8,7 @@
 
 - Corregido el bloqueo al abrir Planeaciones cuando sus apartados estan vacios (error al leer proposito).
 - Protegida la exportacion de planeaciones con apartados vacios a Word y PDF.
+- Corregida la asignacion y evaluacion NEE cuando los respaldos antiguos guardan identificadores de alumnos como texto.
 - Conservados los contenidos existentes, las tareas, las evaluaciones y los respaldos.
 - Actualizacion disponible para Windows, macOS y Android en Primaria y Secundaria.
 

@@ -21,7 +21,7 @@ function registerQrAssignments({ ipcMain, all, run, transaction, grupoValido, no
     if (inicio > fin) throw new Error('Revisa el ciclo escolar.');
     return `qr_adecuaciones:${g}:${inicio}:${fin}:${secundaria ? 'MATERIA' : normalizarCampo(campo)}`;
   };
-  const applies = (act, id) => !Array.isArray(act?.alumno_ids) || act.alumno_ids.includes(Number(id));
+  const applies = (act, id) => !Array.isArray(act?.alumno_ids) || act.alumno_ids.some(recipient => Number(recipient) === Number(id));
   const list = async (g, inicio, fin, campo) => {
     checkDate(inicio); checkDate(fin);
     if (inicio > fin) throw new Error('Revisa el rango de fechas.');
@@ -40,7 +40,10 @@ function registerQrAssignments({ ipcMain, all, run, transaction, grupoValido, no
     }
     return [...items.values()].filter(a => secundaria || !campo || campo === 'TODOS' || normalizarCampo(a.campo) === normalizarCampo(campo));
   };
-  ipcMain.handle('get-qr-adecuaciones', async (_, g, inicio, fin, campo) => read(profileKey(grupoValido(g), inicio, fin, campo), []));
+  ipcMain.handle('get-qr-adecuaciones', async (_, g, inicio, fin, campo) => {
+    const ids = await read(profileKey(grupoValido(g), inicio, fin, campo), []);
+    return Array.isArray(ids) ? [...new Set(ids.map(Number).filter(Number.isSafeInteger))] : [];
+  });
   ipcMain.handle('save-qr-adecuaciones', async (_, g, inicio, fin, campo, ids) => {
     g = grupoValido(g);
     const key = profileKey(g, inicio, fin, campo);
