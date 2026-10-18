@@ -186,7 +186,7 @@ const Licencia = ({ onActivated, onVolver }) => {
               onMouseOver={(e) => { e.target.style.background = '#3498db'; e.target.style.color = 'white'; }}
               onMouseOut={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#3498db'; }}
             >
-              Iniciar Prueba Gratuita de 7 Días
+              Iniciar Prueba Gratuita de 1 Día
             </button>
             <p style={{fontSize: "0.8rem", color: "#7f8c8d", marginTop: "8px", lineHeight: "1.4"}}>
               *El periodo de prueba de 7 días no incluye las funciones de Inteligencia Artificial (ELARA). Al activar tu licencia con archivo permanente, tendrás acceso completo a todos los servicios y a la IA de ELARA.

@@ -23,7 +23,7 @@
     "appId": "com.josue.planificador.secundaria",
     "productName": "Planificador Docente Secundaria",
     "npmRebuild": false,
-    "asar": false,
+    "asar": true,
     "directories": {
       "output": "release"
     },

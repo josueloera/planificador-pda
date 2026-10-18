@@ -1,5 +1,11 @@
 # Version 1.0.20
 
+- En Secundaria puedes editar la letra del grupo y asignar cada grupo a su escuela; la lista permite filtrar por escuela.
+
+- Prueba gratuita de exactamente 24 horas por instalacion; al vencer, la pantalla de licencia bloquea el acceso a los menus.
+
+- Plano didactico visible al inicio de Planeaciones, con los mismos 25 apartados editables en Windows, macOS y Android.
+
 - Corregido el bloqueo al abrir Planeaciones cuando sus apartados estan vacios (error al leer proposito).
 - Protegida la exportacion de planeaciones con apartados vacios a Word y PDF.
 - Conservados los contenidos existentes, las tareas, las evaluaciones y los respaldos.

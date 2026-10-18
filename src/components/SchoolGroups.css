@@ -1,0 +1,8 @@
+.grupo-escuela { margin: 0 0 12px; padding: 6px 10px; border-radius: 14px; background: rgba(255,255,255,.12); font-size: .9rem; }
+.grupo-editar { padding: 8px 12px; border: 1px solid rgba(255,255,255,.55); border-radius: 8px; background: rgba(255,255,255,.12); color: white; cursor: pointer; }
+.grupo-editar:focus-visible, .escuela-filtro select:focus-visible { outline: 3px solid #ffe082; outline-offset: 2px; }
+.escuela-filtro { display:flex; align-items:center; gap:12px; margin: 0 0 24px; font-weight:700; }
+.escuela-filtro select { min-height:42px; padding:8px 12px; border-radius:8px; }
+.modal-overlay { overflow-y:auto; }
+.modal-content { max-height:calc(100vh - 40px); overflow-y:auto; }
+@media(max-width:600px){.escuela-filtro{align-items:stretch;flex-direction:column}.grupo-editar{min-height:42px}}

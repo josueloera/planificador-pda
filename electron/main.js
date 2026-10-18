@@ -130,7 +130,8 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS vistos (tipo TEXT, item_id TEXT, PRIMARY KEY(tipo, item_id))`);
   
   // Novedades para Secundaria (Múltiples Grupos)
-  db.run(`CREATE TABLE IF NOT EXISTS grupos_maestro (id INTEGER PRIMARY KEY AUTOINCREMENT, grado INTEGER, seccion TEXT, disciplina_id INTEGER, tipo TEXT, ciclo_escolar TEXT)`);
+  db.run(`CREATE TABLE IF NOT EXISTS grupos_maestro (id INTEGER PRIMARY KEY AUTOINCREMENT, grado INTEGER, seccion TEXT, disciplina_id INTEGER, tipo TEXT, ciclo_escolar TEXT, escuela TEXT)`);
+  db.run('ALTER TABLE grupos_maestro ADD COLUMN escuela TEXT', () => {});
   
   // Migración segura para bases de datos existentes (añadir columnas sin romper si ya existen)
   const tablasMigrar = ['alumnos', 'criterios', 'planeacion', 'proyectos', 'incidencias'];
@@ -428,7 +429,8 @@ ipcMain.handle('get-grupos', async () => {
   ]);
   return grupos.map(g => ({ ...g, nombre_disciplina: disciplinas.find(d => Number(d.id) === Number(g.disciplina_id))?.nombre || 'Materia del grupo' }));
 });
-ipcMain.handle('add-grupo', async (e, g) => new Promise((r, j) => db.run("INSERT INTO grupos_maestro (grado, seccion, disciplina_id, tipo, ciclo_escolar) VALUES (?, ?, ?, ?, ?)", [g.grado, g.seccion, g.disciplina_id, g.tipo, g.ciclo_escolar], function(err){ err ? j(err) : r({id: this.lastID, ...g}) })));
+ipcMain.handle('add-grupo', async (e, g) => new Promise((r, j) => db.run("INSERT INTO grupos_maestro (grado, seccion, disciplina_id, tipo, ciclo_escolar, escuela) VALUES (?, ?, ?, ?, ?, ?)", [g.grado, g.seccion, g.disciplina_id, g.tipo, g.ciclo_escolar, String(g.escuela || '').trim()], function(err){ err ? j(err) : r({id: this.lastID, ...g, escuela:String(g.escuela || '').trim()}) })));
+ipcMain.handle('update-grupo', async (e, g) => new Promise((resolve,reject) => db.run('UPDATE grupos_maestro SET grado=?, seccion=?, disciplina_id=?, tipo=?, ciclo_escolar=?, escuela=? WHERE id=?', [g.grado, String(g.seccion || '').trim().toUpperCase(), g.disciplina_id, g.tipo, g.ciclo_escolar, String(g.escuela || '').trim(), Number(g.id)], function(error){ if(error) reject(error); else if(!this.changes) reject(new Error('El grupo ya no existe.')); else resolve({success:true}); })));
 ipcMain.handle('delete-grupo', async (e, id) => new Promise(r => db.run("DELETE FROM grupos_maestro WHERE id = ?", [id], () => r(true))));
 
 // -- ALUMNOS --
