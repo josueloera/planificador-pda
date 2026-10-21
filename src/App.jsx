@@ -1,3 +1,7 @@
+import GoogleSync from './components/GoogleSync';
+import CTE from './components/CTE';
+import Specialists from './components/Specialists';
+import LanTransfer from './components/LanTransfer';
 import { contextoDocente, claveDocente, leerDocumento } from './seguimientoDocente';
 import { ObservacionesDia, ObservacionesTrimestre } from './components/ObservacionesDia';
 import DosificadorEditable from './components/DosificadorEditable';
@@ -584,10 +588,14 @@ function App() {
       }} />;
     }
 
+    if (vista === 'CTE') return <CTE key={contextoTrabajo} ipc={ipcRenderer} edition='secundaria' group={grupoActual} cycle={configCiclo} onBack={()=>setVista('MENU')} />;
+    if (vista === 'LAN') return <LanTransfer ipc={ipcRenderer} onBack={()=>setVista('MENU')} />;
     if (vista === 'ANALITICO') return <ProgramaAnalitico key={contextoTrabajo} ipc={ipcRenderer} contexto={contextoTrabajo} variante='secundaria' grupo={grupoActual} grado={grado} ciclo={configCiclo} onVolver={()=>setVista('MENU')} />;
     if (vista === 'ALUMNO') return <Alumno ipcRenderer={ipcRenderer} variante='secundaria' configCiclo={configCiclo} grupoActual={grupoActual} onVolver={()=>setVista('MENU')} />;
     if(vista === 'MENU') {
     const menuItems = [
+        {id:'CTE',icon:'📒',label:'Consejo Técnico Escolar',desc:'Sesiones, acuerdos y evidencias',color:'#3655a2',action:()=>setVista('CTE')},
+        {id:'LAN',icon:'🔗',label:'Conectar dispositivos',desc:'Transferir base de datos por wifi',color:'#147768',action:()=>setVista('LAN')},
         { id: 'ANALITICO', icon: '📘', label: 'Programa analítico', desc: 'Diagnóstico, PDA y codiseño', color: '#4338ca', action: ()=>setVista('ANALITICO') },
         { id: 'ALUMNO', icon: '👤', label: 'ALUMNO', desc: 'Perfil, calificaciones y expediente', color: '#147768', action: ()=>setVista('ALUMNO') },
       { id: 'GRUPO', icon: '👥', label: grupoActual ? `${grupoActual.grado}º${grupoActual.seccion} ${grupoActual.nombre_disciplina} · ${grupoActual.escuela || 'Escuela sin asignar'}` : 'Mi Grupo', desc: `${alumnos.length} alumnos`, color: '#6C5CE7', action: ()=>setVista('GRUPO') },
@@ -607,7 +615,7 @@ function App() {
     <div className="pantalla-menu">
         <div className="menu-header-zone">
             <div className="menu-header-glow"></div>
-            <h1 className="titulo-principal">PLANIFICADOR DOCENTE</h1>
+            <img src="./elara-icon.png" alt="Elara" style={{width:100,height:100,borderRadius:22}} /><h1 className="titulo-principal">ELARA</h1>
             <p className="menu-subtitle">Ciclo Escolar 2026 - 2027</p>
             {licenciaInfo && (
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '10px'}}>

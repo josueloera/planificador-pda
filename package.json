@@ -1,7 +1,7 @@
 {
   "name": "planificador-docente-secundaria",
   "private": true,
-  "version": "1.0.23",
+  "version": "1.0.25",
   "description": "Herramienta de Gestión Docente NEM - Secundaria",
   "author": "Josue Loera",
   "main": "electron/main.js",
@@ -17,11 +17,12 @@
     "dist": "vite build && electron-builder",
     "dist:mac": "vite build && electron-builder --mac --universal",
     "test:teacher": "node --test scripts/test-teacher-advisor.mjs scripts/test-teacher-ai.cjs",
-    "test:backup": "node --test scripts/test-backups.cjs"
+    "test:backup": "node --test scripts/test-backups.cjs",
+    "test:elara": "node --test scripts/test-elara.mjs scripts/test-google-service.cjs"
   },
   "build": {
     "appId": "com.josue.planificador.secundaria",
-    "productName": "Planificador Docente Secundaria",
+    "productName": "Elara Secundaria",
     "npmRebuild": false,
     "asar": true,
     "directories": {
@@ -46,7 +47,8 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "Planificador-Docente-Secundaria-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Planificador-Docente-Secundaria-Setup-${version}-${arch}.${ext}",
+      "icon": "resources/elara.ico"
     },
     "mac": {
       "target": [
@@ -64,7 +66,8 @@
         }
       ],
       "category": "public.app-category.education",
-      "artifactName": "Planificador-Docente-Secundaria-${version}-${arch}.${ext}"
+      "artifactName": "Planificador-Docente-Secundaria-${version}-${arch}.${ext}",
+      "icon": "resources/elara.icns"
     },
     "publish": [
       {

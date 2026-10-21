@@ -40,6 +40,8 @@ function getLocalIps() {
   return ips;
 }
 
+// Conservar la carpeta histórica al cambiar el nombre visible a Elara.
+app.setPath('userData', path.join(app.getPath('appData'), 'planificador-docente-secundaria'));
 // Asegurar que exista la carpeta userData antes de cualquier operacion de archivo
 const userDataDir = app.getPath('userData');
 if (!fs.existsSync(userDataDir)) {
@@ -84,6 +86,7 @@ if (app.isPackaged) {
 console.log(`\n📂 BASE DE DATOS DE USUARIO: ${dbPath}`);
 const db = new sqlite3.Database(dbPath);
 require('./databaseBackup.cjs').registerBackupHandlers({ db, dbPath, sqlite3, ipcMain, dialog: require('electron').dialog, BrowserWindow, app, edition: 'secundaria', version: app.getVersion() });
+require('./elaraDesktop.cjs').registerElara({db,dbPath,sqlite3,ipcMain,app,edition:'secundaria',version:app.getVersion()});
 
 // --- 1.B GESTIÓN DE LA BASE DE DATOS UNIVERSAL (SEP) ---
 let universalDbPath;
@@ -193,7 +196,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: "Planificador Docente",
+    title: "Elara",
+    icon: path.join(__dirname, "../dist/elara-icon.png"),
     show: false,
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -474,6 +478,7 @@ const { transaction: evaluationTransaction, beforeQrMutation } = require('./eval
   ipcMain, db, variant: 'secundaria', onChange: notifyEvaluationChange
 });
 // Un único orden de escritura para QR, criterios y vínculos del ciclo.
+require('./specialists.cjs').registerSpecialists({ipcMain,db,transaction:evaluationTransaction,onChange:notifyEvaluationChange});
 const registerQrMutation = (channel, handler) => ipcMain.handle(channel, async (...args) => {
   const result = await evaluationTransaction(async () => {
     await beforeQrMutation(channel, args);
