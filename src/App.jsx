@@ -1,30 +1,32 @@
 import SortableMenu from './components/SortableMenu';
 import GoogleSync from './components/GoogleSync';
-import CTE from './components/CTE';
-import Specialists from './components/Specialists';
-import LanTransfer from './components/LanTransfer';
+const CTE = lazy(() => import('./components/CTE'));
+const Specialists = lazy(() => import('./components/Specialists'));
+const LanTransfer = lazy(() => import('./components/LanTransfer'));
 import { contextoDocente, claveDocente, leerDocumento } from './seguimientoDocente';
-import { ObservacionesDia, ObservacionesTrimestre } from './components/ObservacionesDia';
-import DosificadorEditable from './components/DosificadorEditable';
-import ProgramaAnalitico from './components/ProgramaAnalitico';
+const ObservacionesDia = lazy(() => import('./components/ObservacionesDia').then(m => ({default:m.ObservacionesDia})));
+const ObservacionesTrimestre = lazy(() => import('./components/ObservacionesDia').then(m => ({default:m.ObservacionesTrimestre})));
+const DosificadorEditable = lazy(() => import('./components/DosificadorEditable'));
+const ProgramaAnalitico = lazy(() => import('./components/ProgramaAnalitico'));
 import LegalInfo from './components/LegalInfo';
-import PlaneacionApartados from './components/PlaneacionApartados';
-import ExportDocument from './components/ExportDocument';
-import Incidencias from './components/Incidencias';
-import { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react';
+const PlaneacionApartados = lazy(() => import('./components/PlaneacionApartados'));
+const ExportDocument = lazy(() => import('./components/ExportDocument'));
+const Incidencias = lazy(() => import('./components/Incidencias'));
+import { useState, useEffect, useCallback, memo, useMemo, useRef, lazy, Suspense } from 'react';
 import './App.css';
 
 // --- IMPORTACIONES (Si alguna falla, el código tiene protección) ---
 import { obtenerPlanSemanal } from './planner_logic'; 
-import GeneradorMaterial from './components/GeneradorMaterial';
+const GeneradorMaterial = lazy(() => import('./components/GeneradorMaterial'));
 import Licencia from './components/Licencia';
-import ConfiguracionCiclo from './components/ConfiguracionCiclo';
-import DashboardGrupos from './components/DashboardGrupos';
-import Alumno from './components/Alumno';
-import ControlQR from './components/ControlQR';
+const ConfiguracionCiclo = lazy(() => import('./components/ConfiguracionCiclo'));
+const DashboardGrupos = lazy(() => import('./components/DashboardGrupos'));
+const Alumno = lazy(() => import('./components/Alumno'));
+const ControlQR = lazy(() => import('./components/ControlQR'));
 import { EstadoEvaluacionQR, VincularEvaluacionQR } from './components/EvaluacionAutomatica';
 import { mezclarNotasAutomaticas, promedioPeriodo } from './evaluacionAutomatica';
-import { exportarPlanoPdf, exportarPlanoWord, FORMULARIO_PROYECTO } from './utils/planeacionDocument';
+const exportarPlanoPdf = async data => (await import('./utils/planeacionDocument')).exportarPlanoPdf(data);
+const exportarPlanoWord = async data => (await import('./utils/planeacionDocument')).exportarPlanoWord(data);
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
 
@@ -234,12 +236,10 @@ function App() {
         setCargandoLicencia(false);
       });
       ipcRenderer.invoke('get-config').then(cfg => {
-        if (cfg.fechaInicioStr || cfg.periodos) {
-            setConfigCiclo({
-                fechaInicioStr: cfg.fechaInicioStr || '2026-08-31',
-                periodos: cfg.periodos ? JSON.parse(cfg.periodos) : DEFAULT_PERIODOS
-            });
-        }
+        let periodos = DEFAULT_PERIODOS;
+        try { if (cfg.periodos) periodos = JSON.parse(cfg.periodos); } catch (error) { console.error('No se pudieron leer los periodos guardados.', error); }
+        setConfigCiclo({ fechaInicioStr: cfg.fechaInicioStr || '2026-08-31', periodos,
+          nombreDocente: cfg.nombreDocente || '', nombreEscuela: cfg.nombreEscuela || '', cct: cfg.cct || '' });
       });
     } else {
       // Si corre en web pura sin electron
@@ -682,7 +682,7 @@ function App() {
             <h2>📱 Control QR</h2>
             <button className="btn-volver" onClick={() => setVista('MENU')}>Volver al Menú</button>
           </div>
-          <ControlQR
+          <Suspense fallback={<p role="status">Cargando herramientas QR…</p>}><ControlQR
             grupoActual={grupoActual}
             alumnos={alumnos}
             criterios={criterios}
@@ -702,7 +702,7 @@ function App() {
             onGradeSaved={() => {
               if (typeof cargarEval === 'function') cargarEval();
             }}
-          />
+          /></Suspense>
         </div>
       );
   }
@@ -711,24 +711,19 @@ function App() {
       return <GeneradorMaterial onVolver={() => setVista('MENU')} pdasDisponibles={pdasDisponibles} grado={grado} />;
   }
 
-  if(vista === 'CONFIG') {
+  if (vista === 'CONFIG') {
       return <ConfiguracionCiclo onVolver={() => {
-          setVista('MENU');
-          // Reload config
-          ipcRenderer.invoke('get-config').then(cfg => {
-            if (cfg.fechaInicioStr || cfg.periodos) {
-                setConfigCiclo({
-                    fechaInicioStr: cfg.fechaInicioStr || '2026-08-31',
-                    periodos: cfg.periodos ? JSON.parse(cfg.periodos) : DEFAULT_PERIODOS
-                });
-            }
-          });
-      }} 
-      currentConfig={configCiclo} 
-      defaultConfig={{fechaInicioStr: '2026-08-31', periodos: DEFAULT_PERIODOS}} />;
-  }
+        setVista('MENU');
+        ipcRenderer.invoke('get-config').then(cfg => {
+          let periodos = DEFAULT_PERIODOS;
+          try { if (cfg.periodos) periodos = JSON.parse(cfg.periodos); } catch (error) { console.error('No se pudieron leer los periodos guardados.', error); }
+          setConfigCiclo({ fechaInicioStr: cfg.fechaInicioStr || '2026-08-31', periodos,
+            nombreDocente: cfg.nombreDocente || '', nombreEscuela: cfg.nombreEscuela || '', cct: cfg.cct || '' });
+        });
+      }} currentConfig={configCiclo} defaultConfig={{fechaInicioStr: '2026-08-31', periodos: DEFAULT_PERIODOS}} />;
+    }
 
-  if (vista === 'LICENCIA') {
+    if (vista === 'LICENCIA') {
       return <Licencia 
           onActivated={() => {
               ipcRenderer.invoke('get-license-status').then(res => {
