@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
@@ -7,7 +7,7 @@ import ClippyAssistant from './components/ClippyAssistant.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RenderErrorBoundary><App /></RenderErrorBoundary>
+    <RenderErrorBoundary><Suspense fallback={<div style={{minHeight:"100vh",display:"grid",placeItems:"center"}}>Cargando...</div>}><App /></Suspense></RenderErrorBoundary>
     <ClippyAssistant />
   </StrictMode>,
 )

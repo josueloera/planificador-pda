@@ -1,3 +1,9 @@
+# Elara 1.0.34
+
+- Corrige la apertura de las tarjetas de Secundaria mientras se cargan sus pantallas.
+- Conserva el detalle visible y registrado de errores inesperados.
+- Mantiene los arreglos de Primaria y las evaluaciones trimestrales de 1.0.32.
+
 # Elara 1.0.33
 
 - Conserva el grado elegido en Primaria al reiniciar.
