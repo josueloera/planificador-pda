@@ -1,6 +1,6 @@
 # Elara 1.0.35
 
-- Corrige la fecha inicial de EvaluaciÃ³n para usar el dÃ­a local y evitar el desfase por UTC.
+- Corrige la fecha inicial de Evaluación para usar el día local y evitar el desfase por UTC.
 
 # Elara 1.0.34
 
@@ -24,3 +24,4 @@
 - Wi-Fi: permite transferir respaldos entre versiones distintas de la misma edicion cuando el protocolo y el formato son compatibles.
 
 Windows y macOS: actualiza desde Elara o instala sobre la version anterior. Android: requiere un APK firmado con la llave original para actualizar sin perder los datos.
+
