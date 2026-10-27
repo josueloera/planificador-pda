@@ -1,3 +1,7 @@
+# Elara 1.0.35
+
+- Corrige la fecha inicial de EvaluaciÃ³n para usar el dÃ­a local y evitar el desfase por UTC.
+
 # Elara 1.0.34
 
 - Corrige la apertura de las tarjetas de Secundaria mientras se cargan sus pantallas.

@@ -1,7 +1,7 @@
 {
   "name": "planificador-docente-secundaria",
   "private": true,
-  "version": "1.0.34",
+  "version": "1.0.35",
   "description": "Herramienta de Gestión Docente NEM - Secundaria",
   "author": "Josue Loera",
   "main": "electron/main.js",
