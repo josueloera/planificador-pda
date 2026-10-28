@@ -491,18 +491,46 @@ const registerQrMutation = (channel, handler) => ipcMain.handle(channel, async (
 });
 
 // -- NOTAS --
-ipcMain.handle('get-notas-fecha', async (e, fecha) => new Promise(r => db.all("SELECT * FROM notas WHERE fecha = ?", [fecha], (err, rows) => r(rows || []))));
-ipcMain.handle('get-notas-rango', async (e, f1, f2) => new Promise(r => db.all("SELECT * FROM notas WHERE fecha >= ? AND fecha <= ?", [f1, f2], (err, rows) => r(rows || []))));
-ipcMain.handle('save-nota', async (e, aid, cid, fecha, valor) => {
-  return new Promise((r) => {
-    if (valor === null || valor === '') {
-        db.run("DELETE FROM notas WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?", [aid, cid, fecha], () => r(true));
-    } else {
-        db.run(`UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?`, [valor, aid, cid, fecha], function() {
-          if (this.changes === 0) db.run(`INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)`, [aid, cid, fecha, valor], () => r(true));
-          else r(true);
-        });
+ipcMain.handle('get-notas-fecha', async (e, fecha, grupo_id) => {
+  const grupoId = Number(grupo_id);
+  if (!Number.isInteger(grupoId) || grupoId <= 0) throw new Error('Selecciona un grupo válido para consultar las calificaciones.');
+  return new Promise((resolve, reject) => db.all(
+    `SELECT n.* FROM notas n JOIN criterios c ON c.id = n.criterio_id
+     WHERE n.fecha = ? AND c.grupo_id = ?`, [fecha, grupoId],
+    (err, rows) => err ? reject(err) : resolve(rows || [])
+  ));
+});
+ipcMain.handle('get-notas-rango', async (e, f1, f2, grupo_id) => {
+  const grupoId = Number(grupo_id);
+  if (!Number.isInteger(grupoId) || grupoId <= 0) throw new Error('Selecciona un grupo válido para consultar las calificaciones.');
+  return new Promise((resolve, reject) => db.all(
+    `SELECT n.* FROM notas n JOIN criterios c ON c.id = n.criterio_id
+     WHERE n.fecha >= ? AND n.fecha <= ? AND c.grupo_id = ?`, [f1, f2, grupoId],
+    (err, rows) => err ? reject(err) : resolve(rows || [])
+  ));
+});
+ipcMain.handle('save-nota', async (e, aid, cid, fecha, valor, grupo_id) => {
+  return new Promise((resolve, reject) => {
+    const grupoId = Number(grupo_id), alumnoId = Number(aid), criterioId = Number(cid);
+    if (![grupoId, alumnoId, criterioId].every(Number.isSafeInteger) || grupoId <= 0 || alumnoId <= 0 || criterioId <= 0
+      || typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)
+      || Number.isNaN(Date.parse(fecha)) || new Date(fecha).toISOString().slice(0, 10) !== fecha) {
+      return reject(new Error('La calificación no tiene un grupo, alumno, criterio o fecha válidos.'));
     }
+    db.get(`SELECT 1 AS valido FROM alumnos a JOIN criterios c ON c.id = ?
+      WHERE a.id = ? AND a.grupo_id = ? AND c.grupo_id = ?`, [criterioId, alumnoId, grupoId, grupoId], (checkError, row) => {
+      if (checkError) return reject(checkError);
+      if (!row) return reject(new Error('El alumno y el criterio ya no pertenecen al grupo seleccionado.'));
+      if (valor === null || valor === '') {
+        db.run("DELETE FROM notas WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?", [alumnoId, criterioId, fecha], err => err ? reject(err) : resolve(true));
+      } else {
+        db.run(`UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?`, [valor, alumnoId, criterioId, fecha], function(err) {
+          if (err) return reject(err);
+          if (this.changes === 0) db.run(`INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)`, [alumnoId, criterioId, fecha, valor], err => err ? reject(err) : resolve(true));
+          else resolve(true);
+        });
+      }
+    });
   });
 });
 ipcMain.handle('check-hay-datos', async () => new Promise(r => db.get("SELECT count(*) as count FROM notas", (e, row) => r(row?.count > 0))));

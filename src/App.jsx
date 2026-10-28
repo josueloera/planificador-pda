@@ -335,10 +335,11 @@ function App() {
     const grupoId = grupoActual?.id;
     const request = ++cargaEvalRef.current;
     if (!ipcRenderer || !grupoId) return;
+    setNotas({});
     return Promise.all([
       ipcRenderer.invoke('get-alumnos', grupoId),
       ipcRenderer.invoke('get-criterios', grupoId),
-      ipcRenderer.invoke('get-notas-fecha', fecha),
+      ipcRenderer.invoke('get-notas-fecha', fecha, grupoId),
       ipcRenderer.invoke('get-evaluacion-automatica', grupoId, { inicio: fecha, fin: fecha })
     ]).then(([listaAlumnos, listaCriterios, listaNotas, automatica]) => {
       if (request !== cargaEvalRef.current || grupoId !== grupoEvaluacionRef.current) return;
@@ -352,7 +353,7 @@ function App() {
       setNotas(mezclarNotasAutomaticas(listaNotas, automatica, fecha));
     }).catch(err => {
       console.error(err);
-      if (request === cargaEvalRef.current && grupoId === grupoEvaluacionRef.current) showToast('❌ No se pudo cargar la evaluación.');
+      if (request === cargaEvalRef.current && grupoId === grupoEvaluacionRef.current) showToast(`❌ No se pudo cargar la evaluación: ${err.message || err}`);
     });
   };
 
@@ -388,7 +389,17 @@ function App() {
       setCriterios(prev => [...prev, { frontId: `new-${Date.now()}`, nombre: '', porcentaje: '' }]);
   };
   
-  const handleSaveNota = useCallback((aid, cid, val) => { if (evaluacionAutomatica?.enlaces?.some(e => e.criterio_id === cid)) return; setNotas(prev => ({...prev, [`${aid}-${cid}`]: val})); if(cid && typeof cid === 'number') { ipcRenderer.invoke('save-nota', aid, cid, fechaEval, val).catch(console.error); } }, [fechaEval, evaluacionAutomatica]);
+  const handleSaveNota = useCallback(async (aid, cid, val) => {
+    if (evaluacionAutomatica?.enlaces?.some(e => Number(e.criterio_id) === Number(cid))) return;
+    if (!ipcRenderer || !Number.isInteger(Number(cid))) return showToast('No se pudo guardar: revisa el criterio de evaluación.');
+    try {
+      await ipcRenderer.invoke('save-nota', aid, cid, fechaEval, val, grupoActual?.id);
+      setNotas(prev => ({ ...prev, [`${aid}-${cid}`]: val }));
+    } catch (err) {
+      console.error('Error al guardar calificación:', err);
+      showToast(`❌ No se guardó la calificación: ${err.message || err}`);
+    }
+  }, [fechaEval, grupoActual?.id, evaluacionAutomatica, showToast]);
   
   const guardarConfig = () => {
       if (!grupoActual?.id) return showToast('⚠️ Selecciona un grupo antes de guardar criterios.');
@@ -419,9 +430,10 @@ function App() {
         return;
       }
       setCargandoReporte(true);
+      setResumen([]);
       const periodo = configCiclo.periodos[trimestre] || { inicio: '2026-08-31', fin: '2026-11-27' };
       if(ipcRenderer) {
-          Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin), ipcRenderer.invoke('get-evaluacion-automatica', grupoActual?.id, { inicio: periodo.inicio, fin: periodo.fin }) ]).then(([todosCriterios, todasNotas, automatica]) => {
+          Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin, grupoActual.id), ipcRenderer.invoke('get-evaluacion-automatica', grupoActual?.id, { inicio: periodo.inicio, fin: periodo.fin }) ]).then(([todosCriterios, todasNotas, automatica]) => {
           if (request !== cargaReporteRef.current) return;
           const reporte = alumnos.map(alumno => {
               const fila = { id: alumno.id, nombre: alumno.nombre };
