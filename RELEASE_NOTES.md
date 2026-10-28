@@ -1,3 +1,8 @@
+# Elara Secundaria 1.0.37
+
+- Evita que una calificación manual aparezca guardada cuando SQLite no confirmó el guardado.
+- Muestra los errores de lectura en Evaluación y limita sus consultas al grupo activo.
+
 # Elara 1.0.36
 
 - Conserva las calificaciones manuales anteriores cuando Control QR no tiene una nota para el mismo alumno, criterio y fecha.
