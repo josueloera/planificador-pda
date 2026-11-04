@@ -474,7 +474,7 @@ const notifyEvaluationChange = (grupoId = null) => {
     }
   }
 };
-const { transaction: evaluationTransaction, beforeQrMutation } = require('./evaluationQr').registerEvaluationHandlers({
+const { transaction: evaluationTransaction, beforeQrMutation, waitForWrites: waitForEvaluationWrites } = require('./evaluationQr').registerEvaluationHandlers({
   ipcMain, db, variant: 'secundaria', onChange: notifyEvaluationChange
 });
 // Un único orden de escritura para QR, criterios y vínculos del ciclo.
@@ -492,6 +492,7 @@ const registerQrMutation = (channel, handler) => ipcMain.handle(channel, async (
 
 // -- NOTAS --
 ipcMain.handle('get-notas-fecha', async (e, fecha, grupo_id) => {
+  await waitForEvaluationWrites();
   const grupoId = Number(grupo_id);
   if (!Number.isInteger(grupoId) || grupoId <= 0) throw new Error('Selecciona un grupo válido para consultar las calificaciones.');
   return new Promise((resolve, reject) => db.all(
@@ -501,6 +502,7 @@ ipcMain.handle('get-notas-fecha', async (e, fecha, grupo_id) => {
   ));
 });
 ipcMain.handle('get-notas-rango', async (e, f1, f2, grupo_id) => {
+  await waitForEvaluationWrites();
   const grupoId = Number(grupo_id);
   if (!Number.isInteger(grupoId) || grupoId <= 0) throw new Error('Selecciona un grupo válido para consultar las calificaciones.');
   return new Promise((resolve, reject) => db.all(
@@ -510,28 +512,40 @@ ipcMain.handle('get-notas-rango', async (e, f1, f2, grupo_id) => {
   ));
 });
 ipcMain.handle('save-nota', async (e, aid, cid, fecha, valor, grupo_id) => {
-  return new Promise((resolve, reject) => {
-    const grupoId = Number(grupo_id), alumnoId = Number(aid), criterioId = Number(cid);
-    if (![grupoId, alumnoId, criterioId].every(Number.isSafeInteger) || grupoId <= 0 || alumnoId <= 0 || criterioId <= 0
-      || typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)
-      || Number.isNaN(Date.parse(fecha)) || new Date(fecha).toISOString().slice(0, 10) !== fecha) {
-      return reject(new Error('La calificación no tiene un grupo, alumno, criterio o fecha válidos.'));
+  const grupoId = Number(grupo_id), alumnoId = Number(aid), criterioId = Number(cid);
+  if (![grupoId, alumnoId, criterioId].every(Number.isSafeInteger) || grupoId <= 0 || alumnoId <= 0 || criterioId <= 0
+    || typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)
+    || Number.isNaN(Date.parse(fecha)) || new Date(fecha).toISOString().slice(0, 10) !== fecha) {
+    throw new Error('La calificación no tiene un grupo, alumno, criterio o fecha válidos.');
+  }
+  await evaluationTransaction(async () => {
+    const row = await new Promise((resolve, reject) => db.get(
+      `SELECT 1 AS valido FROM alumnos a JOIN criterios c ON c.id = ?
+       WHERE a.id = ? AND a.grupo_id = ? AND c.grupo_id = ?`,
+      [criterioId, alumnoId, grupoId, grupoId],
+      (err, result) => err ? reject(err) : resolve(result)
+    ));
+    if (!row) throw new Error('El alumno y el criterio ya no pertenecen al grupo seleccionado.');
+    if (valor === null || valor === '') {
+      await new Promise((resolve, reject) => db.run(
+        'DELETE FROM notas WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?',
+        [alumnoId, criterioId, fecha], err => err ? reject(err) : resolve()
+      ));
+      return;
     }
-    db.get(`SELECT 1 AS valido FROM alumnos a JOIN criterios c ON c.id = ?
-      WHERE a.id = ? AND a.grupo_id = ? AND c.grupo_id = ?`, [criterioId, alumnoId, grupoId, grupoId], (checkError, row) => {
-      if (checkError) return reject(checkError);
-      if (!row) return reject(new Error('El alumno y el criterio ya no pertenecen al grupo seleccionado.'));
-      if (valor === null || valor === '') {
-        db.run("DELETE FROM notas WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?", [alumnoId, criterioId, fecha], err => err ? reject(err) : resolve(true));
-      } else {
-        db.run(`UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?`, [valor, alumnoId, criterioId, fecha], function(err) {
-          if (err) return reject(err);
-          if (this.changes === 0) db.run(`INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)`, [alumnoId, criterioId, fecha, valor], err => err ? reject(err) : resolve(true));
-          else resolve(true);
-        });
+    const changed = await new Promise((resolve, reject) => db.run(
+      'UPDATE notas SET valor = ? WHERE alumno_id = ? AND criterio_id = ? AND fecha = ?',
+      [valor, alumnoId, criterioId, fecha], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
       }
-    });
+    ));
+    if (!changed) await new Promise((resolve, reject) => db.run(
+      'INSERT INTO notas (alumno_id, criterio_id, fecha, valor) VALUES (?, ?, ?, ?)',
+      [alumnoId, criterioId, fecha, valor], err => err ? reject(err) : resolve()
+    ));
   });
+  return true;
 });
 ipcMain.handle('check-hay-datos', async () => new Promise(r => db.get("SELECT count(*) as count FROM notas", (e, row) => r(row?.count > 0))));
 

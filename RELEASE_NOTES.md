@@ -1,3 +1,7 @@
+# Elara Secundaria 1.0.38
+
+- Serializa el guardado manual con los cambios de Control QR y espera las escrituras pendientes antes de mostrar notas y reportes.
+
 # Elara Secundaria 1.0.37
 
 - Evita que una calificación manual aparezca guardada cuando SQLite no confirmó el guardado.
@@ -34,3 +38,4 @@
 
 Windows y macOS: actualiza desde Elara o instala sobre la version anterior. Android: requiere un APK firmado con la llave original para actualizar sin perder los datos.
 
+# Elara Secundaria 1.0.38
