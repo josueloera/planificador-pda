@@ -207,7 +207,7 @@ function registerEvaluationHandlers({ ipcMain, db, variant = 'primaria', onChang
       return guardarNotas(rows, criterios);
     });
   });
-  return { transaction, beforeQrMutation: assignments.beforeMutation };
+  return { transaction, beforeQrMutation: assignments.beforeMutation, waitForWrites: () => pendingWrites };
 }
 
 module.exports = { normalizarCampo, registerEvaluationHandlers };
