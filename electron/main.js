@@ -426,6 +426,7 @@ ipcMain.handle('get-pdas-disciplina', async (e, disciplina_id, grado) => {
 });
 
 // -- GRUPOS --
+ipcMain.handle('set-grupo-escuela', async (_, id, escuela) => evaluationTransaction(() => new Promise((resolve,reject) => { if(!Number.isSafeInteger(Number(id)) || Number(id)<=0) return reject(new Error('Selecciona un grupo válido.')); db.run('UPDATE grupos_maestro SET escuela=? WHERE id=?',[String(escuela || '').trim(),Number(id)],function(error){ if(error)reject(error);else if(!this.changes)reject(new Error('El grupo ya no existe.'));else resolve(true); }); })));
 ipcMain.handle('get-grupos', async () => {
   const [grupos, disciplinas] = await Promise.all([
     new Promise((resolve, reject) => db.all('SELECT * FROM grupos_maestro', [], (err, rows) => err ? reject(err) : resolve(rows || []))),
@@ -681,6 +682,7 @@ ipcMain.handle('save-multiple-events', async (e, eventosObj) => {
 });
 ipcMain.handle('clear-evaluaciones-rango', async (e, f1, f2) => new Promise(r => db.run("DELETE FROM notas WHERE fecha >= ? AND fecha <= ?", [f1, f2], () => r(true))));
 ipcMain.handle('get-config', async () => new Promise(r => db.all("SELECT * FROM configuracion", [], (e, rows) => { const map = {}; (rows || []).forEach(x => map[x.llave] = x.valor); r(map); })));
+ipcMain.handle('get-config-value', async (_, key) => { await waitForEvaluationWrites(); return new Promise((resolve,reject) => db.get('SELECT valor FROM configuracion WHERE llave=?',[String(key)],(error,row)=>error?reject(error):resolve(row?.valor ?? null))); });
 registerQrMutation('save-config', async (e, llave, valor) => new Promise((resolve, reject) => {
   db.run("INSERT OR REPLACE INTO configuracion (llave, valor) VALUES (?, ?)", [llave, valor],
     err => err ? reject(err) : resolve(true));
@@ -867,10 +869,12 @@ ipcMain.handle('get-tareas-lista-grupo', async (e, grupo_id) => new Promise(r =>
   );
 }));
 
-ipcMain.handle('get-trabajos-qr', async (e, fecha, grupo_id) => new Promise(r => {
-  db.all("SELECT * FROM trabajos_qr WHERE fecha = ? AND (grupo_id = ? OR grupo_id IS NULL) ORDER BY id DESC",
-    [fecha, grupo_id || null], (err, rows) => r(rows || []));
-}));
+ipcMain.handle('get-trabajos-qr', async (e, fecha, grupo_id) => {
+  await waitForEvaluationWrites();
+  return new Promise((resolve,reject) => db.all(
+    'SELECT t.* FROM trabajos_qr t JOIN alumnos a ON a.id=t.alumno_id WHERE t.fecha=? AND a.grupo_id=? AND (t.grupo_id=? OR t.grupo_id IS NULL) ORDER BY t.id DESC',
+    [fecha,grupo_id,grupo_id],(error,rows)=>error?reject(error):resolve(rows||[])));
+});
 
 registerQrMutation('delete-actividad-fecha', async (e, fecha, nombreTrabajo, grupo_id) => new Promise(r => {
   db.run(

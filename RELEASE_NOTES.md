@@ -1,3 +1,9 @@
+# Elara Secundaria 1.0.39
+
+- Conserva actividades del evaluador QR y recupera las creadas en versiones anteriores.
+- Mejora el guardado de actividades, calendario CTE, exportaciones Excel y respaldo entre Windows y Android.
+- Incluye ajustes de fecha local y evaluacion por categoria.
+
 # Elara Secundaria 1.0.38
 
 - Serializa el guardado manual con los cambios de Control QR y espera las escrituras pendientes antes de mostrar notas y reportes.
