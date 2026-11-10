@@ -26,11 +26,13 @@ const Alumno = lazy(() => import('./components/Alumno'));
 const ControlQR = lazy(() => import('./components/ControlQR'));
 const ExamScan = lazy(() => import('./components/ExamScan'));
 import { EstadoEvaluacionQR, VincularEvaluacionQR } from './components/EvaluacionAutomatica';
-import { mezclarNotasAutomaticas, promedioPeriodo } from './evaluacionAutomatica';
+import { asistenciaConfirmaPresente, mezclarNotasAutomaticas, promedioPeriodo } from './evaluacionAutomatica';
+import { exportDocument } from './utils/documentExport';
 const exportarPlanoPdf = async data => (await import('./utils/planeacionDocument')).exportarPlanoPdf(data);
 const exportarPlanoWord = async data => (await import('./utils/planeacionDocument')).exportarPlanoWord(data);
 
 const ipcRenderer = window.require ? window.require('electron').ipcRenderer : null;
+const exportarReporteTrimestralPdf = () => exportDocument(document.querySelector('.quarterly-report'), 'Reporte de evaluaciones trimestrales', 'pdf').catch(error => window.alert(error?.message || 'No se pudo generar el PDF.'));
 
 const fechaLocalISO = () => {
   const fecha = new Date();
@@ -89,11 +91,11 @@ const detectarMetodologia = (campo) => {
 // Render counter global para depuración
 window.renderCount = (window.renderCount || 0) + 1;
 
-const CeldaNota = memo(({ idAlumno, idCriterio, valorInicial, onGuardar, soloLectura = false }) => {
+const CeldaNota = memo(({ idAlumno, idCriterio, valorInicial, onGuardar, soloLectura = false, notaSinEntrega = false }) => {
     const [valor, setValor] = useState(valorInicial ?? '');
     useEffect(() => { setValor(valorInicial ?? ''); }, [valorInicial]);
     const handleBlur = () => { if (!soloLectura && valor !== valorInicial) onGuardar(idAlumno, idCriterio, valor === '' ? null : valor); };
-    return ( <input className="input-nota" readOnly={soloLectura} title={soloLectura ? "Calificación automática de esta fecha. Corrige los registros en Control QR." : undefined} type="text" inputMode="decimal" style={{background: 'rgba(255,255,255,0.8)', fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center', width: '100%', height: '40px', border: '1px solid #eee', borderRadius: '4px', outline: 'none', color: '#333'}} value={valor} onChange={(e) => setValor(e.target.value)} onBlur={handleBlur} placeholder="-" /> );
+    return ( <input className="input-nota" readOnly={soloLectura} title={notaSinEntrega ? '0.0 aplicado: el alumno tuvo asistencia y la actividad quedó sin calificación.' : soloLectura ? "Calificación automática de esta fecha. Corrige los registros en Control QR." : undefined} type="text" inputMode="decimal" style={{background: 'rgba(255,255,255,0.8)', fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center', width: '100%', height: '40px', border: '1px solid #eee', borderRadius: '4px', outline: 'none', color: '#333'}} value={valor} onChange={(e) => setValor(e.target.value)} onBlur={handleBlur} placeholder="-" /> );
 });
 
 // --- HELPER ---
@@ -141,11 +143,20 @@ function App() {
       criteriosRef.current = criterios;
   }, [criterios]);
 
-  const [notas, setNotas] = useState({}); 
+  const [notas, setNotas] = useState({});
+  const [asistenciaEvaluacion, setAsistenciaEvaluacion] = useState({ clave: '', registros: [] });
   const [fechaEval, setFechaEval] = useState(fechaLocalISO);
   const [modoConfig, setModoConfig] = useState(false);
   const [showModalImportarQR, setShowModalImportarQR] = useState(false);
   const [evaluacionAutomatica, setEvaluacionAutomatica] = useState(null);
+  const claveAsistenciaActual = `${grupoActual?.id}:${fechaEval}`;
+  const asistenciasDelDia = asistenciaEvaluacion.clave === claveAsistenciaActual ? asistenciaEvaluacion.registros : [];
+  const hayActividadEvaluada = Object.values(notas).some(valor => valor != null && String(valor).trim() !== '' && Number.isFinite(Number(valor)));
+  const obtenerCalificacionEvaluacion = (alumnoId, criterio) => {
+    const valor = notas[`${alumnoId}-${criterio.id}`];
+    const faltaConAsistencia = criterio.id != null && hayActividadEvaluada && asistenciaConfirmaPresente(asistenciasDelDia, alumnoId, fechaEval) && (valor == null || String(valor).trim() === '');
+    return { valor: faltaConAsistencia ? '0' : valor, faltaConAsistencia };
+  };
   
   // OTROS
   const [textoPegado, setTextoPegado] = useState("");
@@ -345,8 +356,9 @@ function App() {
       ipcRenderer.invoke('get-alumnos', grupoId),
       ipcRenderer.invoke('get-criterios', grupoId),
       ipcRenderer.invoke('get-notas-fecha', fecha, grupoId),
-      ipcRenderer.invoke('get-evaluacion-automatica', grupoId, { inicio: fecha, fin: fecha })
-    ]).then(([listaAlumnos, listaCriterios, listaNotas, automatica]) => {
+      ipcRenderer.invoke('get-evaluacion-automatica', grupoId, { inicio: fecha, fin: fecha }),
+      ipcRenderer.invoke('get-asistencia-fecha', fecha, grupoId)
+    ]).then(([listaAlumnos, listaCriterios, listaNotas, automatica, asistencia]) => {
       if (request !== cargaEvalRef.current || grupoId !== grupoEvaluacionRef.current) return;
       setAlumnos(listaAlumnos || []);
       const lista = (listaCriterios || []).map((c, idx) => ({
@@ -355,6 +367,7 @@ function App() {
       setCriterios(lista);
       setModoConfig(lista.length === 0);
       setEvaluacionAutomatica(automatica);
+      setAsistenciaEvaluacion({ clave: `${grupoId}:${fecha}`, registros: Array.isArray(asistencia) ? asistencia : [] });
       setNotas(mezclarNotasAutomaticas(listaNotas, automatica, fecha));
     }).catch(err => {
       console.error(err);
@@ -438,12 +451,12 @@ function App() {
       setResumen([]);
       const periodo = configCiclo.periodos[trimestre] || { inicio: '2026-08-31', fin: '2026-11-27' };
       if(ipcRenderer) {
-          Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin, grupoActual.id), ipcRenderer.invoke('get-evaluacion-automatica', grupoActual?.id, { inicio: periodo.inicio, fin: periodo.fin }) ]).then(([todosCriterios, todasNotas, automatica]) => {
+          Promise.all([ ipcRenderer.invoke('get-criterios', grupoActual?.id), ipcRenderer.invoke('get-notas-rango', periodo.inicio, periodo.fin, grupoActual.id), ipcRenderer.invoke('get-evaluacion-automatica', grupoActual?.id, { inicio: periodo.inicio, fin: periodo.fin }), ipcRenderer.invoke('get-asistencia-rango', grupoActual.id, periodo.inicio, periodo.fin) ]).then(([todosCriterios, todasNotas, automatica, asistencias]) => {
           if (request !== cargaReporteRef.current) return;
           const reporte = alumnos.map(alumno => {
               const fila = { id: alumno.id, nombre: alumno.nombre };
               const criteriosAsignatura = todosCriterios || [];
-              const promedio = promedioPeriodo(criteriosAsignatura, todasNotas, automatica, alumno.id);
+              const promedio = promedioPeriodo(criteriosAsignatura, todasNotas, automatica, alumno.id, asistencias || []);
               const promedioFinal = promedio === null ? '-' : promedio.toFixed(1);
               fila.promedioFinal = promedioFinal;
               return fila;
@@ -541,12 +554,15 @@ function App() {
 
   const calcularPromedioDiario = (alumnoId) => {
       if (!criterios || criterios.length === 0) return null;
+      const alumnoPresente = asistenciaConfirmaPresente(asistenciasDelDia, alumnoId, fechaEval);
       let sumaWeighted = 0;
       let totalPorcentaje = 0;
       criterios.forEach(c => {
-          const val = parseFloat(notas[`${alumnoId}-${c.id}`]);
+          const nota = notas[`${alumnoId}-${c.id}`];
+          const faltaConAsistencia = c.id != null && hayActividadEvaluada && alumnoPresente && (nota == null || String(nota).trim() === '');
+          const val = parseFloat(faltaConAsistencia ? '0' : nota);
           const peso = parseFloat(c.porcentaje) || 0;
-          if (!isNaN(val) && peso > 0) {
+          if ((!isNaN(val) || faltaConAsistencia) && peso > 0) {
               sumaWeighted += val * peso;
               totalPorcentaje += peso;
           }
@@ -883,7 +899,7 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
                             </td>
                             {(criterios || []).map(c=>( 
                               <td key={c.frontId} style={{ textAlign: 'center' }}>
-                                <CeldaNota idAlumno={al.id} idCriterio={c.id} valorInicial={notas[`${al.id}-${c.id}`]} onGuardar={handleSaveNota} soloLectura={evaluacionAutomatica?.enlaces?.some(e => e.criterio_id === c.id)} />
+                                <CeldaNota idAlumno={al.id} idCriterio={c.id} valorInicial={obtenerCalificacionEvaluacion(al.id, c).valor} notaSinEntrega={obtenerCalificacionEvaluacion(al.id, c).faltaConAsistencia} onGuardar={handleSaveNota} soloLectura={evaluacionAutomatica?.enlaces?.some(e => e.criterio_id === c.id)} />
                               </td> 
                             ))}
                             <td style={{textAlign:'center', fontWeight:'800', fontSize:'1.2rem', color: '#0f172a'}}>{prom ?? '-'}</td>
@@ -899,7 +915,7 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
   ); }
   // Resto de vistas (Bitácora, Dosif, etc.)
   if(vista === 'BITACORA') return ( <div className="pantalla-dosificador" style={{flexDirection:'row', padding:0}}> <div className="sidebar-lista"><div style={{padding:15, background:'#004aad', color:'white'}}><h3>📂 Alumnos</h3><button onClick={()=>setVista('MENU')} style={{color:'black'}}>Salir</button></div><ul className="lista-alumnos-simple">{alumnos.map(a=><li key={a.id} onClick={()=>selAlumnoBitacora(a)} className={alumnoBitacora?.id===a.id?'activo':''}>{a.nombre}</li>)}</ul></div> <div className="contenido-bitacora" style={{padding:20, flexGrow:1, overflowY:'auto'}}> {!alumnoBitacora ? <div style={{textAlign:'center', marginTop:100, color:'#999'}}><h2>👈 Selecciona un alumno</h2></div> : ( <> <div className="header-alumno"><h2 style={{color:'#004aad'}}>👤 {alumnoBitacora.nombre}</h2><div className="tabs-bitacora"><button className={tabBitacora==='PERFIL'?'activo':''} onClick={()=>setTabBitacora('PERFIL')}>📋 Ficha Técnica</button><button className={tabBitacora==='INCIDENCIAS'?'activo':''} onClick={()=>setTabBitacora('INCIDENCIAS')}>⚠️ Incidencias</button></div></div> {tabBitacora==='PERFIL' ? ( <form className="form-perfil" onSubmit={savePerfil}> <div className="seccion-form"> <h4>Datos Personales</h4> <div className="grid-dos"> <input name="curp" defaultValue={perfil.curp} placeholder="CURP" /> <input name="f_nacimiento" type="date" defaultValue={perfil.f_nacimiento} placeholder="Fecha Nacimiento" /> </div> <div className="grid-dos" style={{marginTop:10}}> <input name="edad" defaultValue={perfil.edad} placeholder="Edad" style={{width:80}} /> <input name="peso" defaultValue={perfil.peso} placeholder="Peso (kg)" /> <input name="estatura" defaultValue={perfil.estatura} placeholder="Estatura (cm)" /> </div> <div className="grid-dos" style={{marginTop:10}}> <input name="tipo_sangre" defaultValue={perfil.tipo_sangre} placeholder="Tipo Sangre" /> <input name="servicio_medico" defaultValue={perfil.servicio_medico} placeholder="Servicio Médico" /> </div> <input name="alergias" defaultValue={perfil.alergias} placeholder="Alergias / Padecimientos" style={{width:'100%', marginTop:10}}/> <input name="direccion" defaultValue={perfil.direccion} placeholder="Dirección completa" style={{width:'100%', marginTop:10}}/> </div> <div className="seccion-form"> <h4>Datos de Padres / Tutores</h4> <div className="grid-dos"><input name="nombre_mama" defaultValue={perfil.nombre_mama} placeholder="Nombre Madre"/><input name="tel_mama" defaultValue={perfil.tel_mama} placeholder="Teléfono"/></div> <div className="grid-dos" style={{marginTop:10}}><input name="nombre_papa" defaultValue={perfil.nombre_papa} placeholder="Nombre Padre"/><input name="tel_papa" defaultValue={perfil.tel_papa} placeholder="Teléfono"/></div> <textarea name="otros_datos" defaultValue={perfil.otros_datos} placeholder="Otros datos relevantes..." style={{width:'100%', marginTop:10, height:60}}></textarea> </div> <button className="btn-guardar">💾 Guardar Ficha</button> </form> ) : ( <Incidencias key={alumnoBitacora.id} ipcRenderer={ipcRenderer} alumnoId={alumnoBitacora.id} /> )} </> )} </div> </div> );
-  if(vista==='TRIMESTRAL') return (<div className="pantalla-dosificador"><div className="header-dosificador no-print">{['EVAL','TRIMESTRAL','DOSIF','BITACORA','CALENDARIO','COMISIONES'].includes(vista) && <ExportDocument title={({'EVAL':'Evaluación','TRIMESTRAL':'Reporte trimestral','DOSIF':'Dosificación','BITACORA':'Bitácora','CALENDARIO':'Calendario','COMISIONES':'Comisiones'})[vista]} selector=".pantalla-dosificador" table={['EVAL','TRIMESTRAL'].includes(vista)} />}<h2>Trimestral</h2><div style={{display:'flex', gap:10}}><button className="btn-guardar" onClick={generarReporteTrimestral}>{cargandoReporte ? '⏳...' : '🔄 Recalcular'}</button><button className="btn-volver" onClick={()=>window.print()}>🖨️ Imprimir</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div></div><div className="tabs-trimestres no-print">{[1,2,3].map(id=><button key={id} className={`tab-btn ${trimestre===id?'activo':''}`} onClick={()=>setTrimestre(id)}>{configCiclo.periodos[id].nombre}</button>)}</div><QuarterlyReport key={contextoTrabajo} ipc={ipcRenderer} contexto={contextoTrabajo} grupo={grupoActual} periodo={configCiclo.periodos[trimestre]} trimestre={trimestre} alumnos={resumen || []} variante="secundaria" /></div>);
+  if(vista==='TRIMESTRAL') return (<div className="pantalla-dosificador"><div className="header-dosificador no-print">{['EVAL','TRIMESTRAL','DOSIF','BITACORA','CALENDARIO','COMISIONES'].includes(vista) && <ExportDocument title={({'EVAL':'Evaluación','TRIMESTRAL':'Reporte trimestral','DOSIF':'Dosificación','BITACORA':'Bitácora','CALENDARIO':'Calendario','COMISIONES':'Comisiones'})[vista]} selector=".pantalla-dosificador" table={['EVAL','TRIMESTRAL'].includes(vista)} />}<h2>Trimestral</h2><div style={{display:'flex', gap:10}}><button className="btn-guardar" onClick={generarReporteTrimestral}>{cargandoReporte ? '⏳...' : '🔄 Recalcular'}</button><button className="btn-volver" onClick={exportarReporteTrimestralPdf}>🖨️ Exportar PDF</button><button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button></div></div><div className="tabs-trimestres no-print">{[1,2,3].map(id=><button key={id} className={`tab-btn ${trimestre===id?'activo':''}`} onClick={()=>setTrimestre(id)}>{configCiclo.periodos[id].nombre}</button>)}</div><QuarterlyReport key={contextoTrabajo} ipc={ipcRenderer} contexto={contextoTrabajo} grupo={grupoActual} periodo={configCiclo.periodos[trimestre]} trimestre={trimestre} alumnos={resumen || []} variante="secundaria" /></div>);
   if(vista === 'DOSIF') return ( <div className="pantalla-dosificador"> <div className="header-dosificador no-print">{['EVAL','TRIMESTRAL','DOSIF','BITACORA','CALENDARIO','COMISIONES'].includes(vista) && <ExportDocument title={({'EVAL':'Evaluación','TRIMESTRAL':'Reporte trimestral','DOSIF':'Dosificación','BITACORA':'Bitácora','CALENDARIO':'Calendario','COMISIONES':'Comisiones'})[vista]} selector=".pantalla-dosificador" table={['EVAL','TRIMESTRAL'].includes(vista)} />} <h2>Dosificador Anual</h2> <button className="btn-volver" onClick={()=>setVista('MENU')}>Salir</button> </div> <DosificadorEditable key={contextoTrabajo} ipc={ipcRenderer} contexto={contextoTrabajo} plan={planDosif} vistos={vistos} toggleVisto={toggleVisto} /></div> );
 
   if(vista === 'PROYECTOS') {
