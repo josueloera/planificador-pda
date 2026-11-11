@@ -1,4 +1,4 @@
-# Elara Secundaria 1.0.48
+# Elara Secundaria 1.0.52\n\n- Corrige el desfase horizontal y vertical del muestreo OMR; la rectificación y la lectura avanzan con el mismo paso de fila para detectar todas las respuestas.\n\n# Elara Secundaria 1.0.48
 
 - Aplica 0.0 únicamente a la actividad y fecha ya evaluadas cuando el alumno asistió.
 

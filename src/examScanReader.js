@@ -1,6 +1,7 @@
 import jsQR from 'jsqr';
 
 const outputWidth = 720;
+const omrRowHeight = 33;
 const luminance = (data, index) => data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114;
 const neighbours = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
@@ -101,7 +102,7 @@ function quadArea(points) {
 }
 
 function chooseMarkerQuad(candidates, questionCount, minTopY = 0) {
-  const expected = outputWidth / (90 + questionCount * 32);
+  const expected = outputWidth / (90 + questionCount * omrRowHeight);
   let best = null, bestScore = -Infinity;
   const n = candidates.length;
   for (let a = 0; a < n - 3; a++) for (let b = a + 1; b < n - 2; b++) for (let c = b + 1; c < n - 1; c++) for (let d = c + 1; d < n; d++) {
@@ -158,7 +159,7 @@ function perspectiveTransform(source, destination) {
 }
 
 function warpPerspective(image, width, height, corners, questionCount) {
-  const targetHeight = 90 + questionCount * 32;
+  const targetHeight = 90 + questionCount * omrRowHeight;
   const target = [
     { x: 10, y: 10 }, { x: outputWidth - 10, y: 10 },
     { x: outputWidth - 10, y: targetHeight - 10 }, { x: 10, y: targetHeight - 10 }
@@ -187,12 +188,12 @@ function readBubbles(image, questionCount) {
   const gridWidth = (outputWidth - 24) * 0.78;
   const gridX = 12 + (outputWidth - 24 - gridWidth) / 2;
   const firstColumnWidth = gridWidth - 4 * 38;
-  const xCenters = [0, 1, 2, 3].map(i => gridX + firstColumnWidth + 19 + i * 38);
+  const xCenters = [0, 1, 2, 3].map(i => gridX + firstColumnWidth + 19 + i * 38 - 8);
   // The printed title/grid margins collapse in CSS. The first bubble center is
   // therefore around y=84 after perspective correction, not y=94. Each table
   // row is 32px high plus its 1px bottom border.
-  const yStart = 84;
-  const rowHeight = 33;
+  const yStart = 88;
+  const rowHeight = omrRowHeight;
   return Array.from({ length: questionCount }, (_, questionIndex) => {
     const levels = xCenters.map(xCenter => {
       let centerSum = 0, centerCount = 0, backgroundSum = 0, backgroundCount = 0;
@@ -202,14 +203,14 @@ function readBubbles(image, questionCount) {
         const x = Math.round(xCenter + dx), y = Math.round(yStart + questionIndex * rowHeight + dy);
         const index = (y * image.width + x) * 4;
         const value = luminance(image.data, index);
-        if (radiusSquared <= 4 * 4) { centerSum += value; centerCount++; }
+        if (radiusSquared <= 7 * 7) { centerSum += value; centerCount++; }
         else if (radiusSquared >= 8 * 8) { backgroundSum += value; backgroundCount++; }
       }
       const centerMean = centerSum / Math.max(1, centerCount);
       const backgroundMean = backgroundSum / Math.max(1, backgroundCount);
       return Math.max(0, Math.min(1, (backgroundMean - centerMean) / 255));
     });
-    const marked = levels.map((ratio, index) => ratio >= 0.10 ? index : -1).filter(index => index >= 0);
+    const marked = levels.map((ratio, index) => ratio >= 0.05 ? index : -1).filter(index => index >= 0);
     return { respuesta: marked.length === 1 ? 'ABCD'[marked[0]] : '', estado: marked.length > 1 ? 'multiple' : marked.length === 0 ? 'blank' : 'read', confianza: Math.max(...levels), niveles: levels };
   });
 }
