@@ -14,6 +14,7 @@ const PlaneacionApartados = lazy(() => import('./components/PlaneacionApartados'
 const ExportDocument = lazy(() => import('./components/ExportDocument'));
 const Incidencias = lazy(() => import('./components/Incidencias'));
 import { useState, useEffect, useCallback, memo, useMemo, useRef, lazy, Suspense } from 'react';
+import RenderErrorBoundary from './components/RenderErrorBoundary.jsx';
 import './App.css';
 
 // --- IMPORTACIONES (Si alguna falla, el código tiene protección) ---
@@ -947,7 +948,11 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
 
   return (
     <>
-      {renderContent()}
+      <RenderErrorBoundary key={vista} sectionName={vista} onBack={() => setVista('MENU')}>
+        <Suspense fallback={<div role="status" style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>Cargando sección...</div>}>
+          {renderContent()}
+        </Suspense>
+      </RenderErrorBoundary>
       {vista === 'MENU' && <LegalInfo />}
       {updateBanner}
     </>

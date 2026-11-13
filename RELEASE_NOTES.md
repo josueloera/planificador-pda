@@ -1,3 +1,9 @@
+# Elara Secundaria 1.0.54
+
+- Permite elegir decimas o numeros enteros para la calificacion final del reporte trimestral.
+- Mejora la lectura de marcas de ExamScan y conserva la calibracion de Secundaria.
+- Muestra el error y permite volver al menu si una seccion falla al abrirse.
+
 # Elara Secundaria 1.0.53
 
 - Mejora el trabajo de ELARA en proyectos y planeaciones con los PDAs, el campo formativo y el contexto actualizado; pide actividades aplicables con pasos, tiempos, materiales y evidencias.

@@ -1,4 +1,5 @@
 import jsQR from 'jsqr';
+import { readBubbles } from './omrBubbleReader.mjs';
 
 const outputWidth = 720;
 const omrRowHeight = 33;
@@ -184,37 +185,6 @@ function warpPerspective(image, width, height, corners, questionCount) {
   return { data: output, width: outputWidth, height: targetHeight };
 }
 
-function readBubbles(image, questionCount) {
-  const gridWidth = (outputWidth - 24) * 0.78;
-  const gridX = 12 + (outputWidth - 24 - gridWidth) / 2;
-  const firstColumnWidth = gridWidth - 4 * 38;
-  const xCenters = [0, 1, 2, 3].map(i => gridX + firstColumnWidth + 19 + i * 38 - 8);
-  // The printed title/grid margins collapse in CSS. The first bubble center is
-  // therefore around y=84 after perspective correction, not y=94. Each table
-  // row is 32px high plus its 1px bottom border.
-  const yStart = 88;
-  const rowHeight = omrRowHeight;
-  return Array.from({ length: questionCount }, (_, questionIndex) => {
-    const levels = xCenters.map(xCenter => {
-      let centerSum = 0, centerCount = 0, backgroundSum = 0, backgroundCount = 0;
-      for (let dy = -14; dy <= 14; dy++) for (let dx = -14; dx <= 14; dx++) {
-        const radiusSquared = dx * dx + dy * dy;
-        if (radiusSquared > 14 * 14) continue;
-        const x = Math.round(xCenter + dx), y = Math.round(yStart + questionIndex * rowHeight + dy);
-        const index = (y * image.width + x) * 4;
-        const value = luminance(image.data, index);
-        if (radiusSquared <= 7 * 7) { centerSum += value; centerCount++; }
-        else if (radiusSquared >= 8 * 8) { backgroundSum += value; backgroundCount++; }
-      }
-      const centerMean = centerSum / Math.max(1, centerCount);
-      const backgroundMean = backgroundSum / Math.max(1, backgroundCount);
-      return Math.max(0, Math.min(1, (backgroundMean - centerMean) / 255));
-    });
-    const marked = levels.map((ratio, index) => ratio >= 0.05 ? index : -1).filter(index => index >= 0);
-    return { respuesta: marked.length === 1 ? 'ABCD'[marked[0]] : '', estado: marked.length > 1 ? 'multiple' : marked.length === 0 ? 'blank' : 'read', confianza: Math.max(...levels), niveles: levels };
-  });
-}
-
 function decodeOmrQrInfo(imageData) {
   const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
   if (!code?.data) throw new Error('No se leyó el QR del encabezado. Incluye completa la hoja de respuestas en la foto.');
@@ -234,7 +204,7 @@ export function readOmrSheet(imageData, questionCount) {
   const corners = chooseMarkerQuad(candidates, questionCount, qrBottom + Math.max(8, imageData.height * 0.015));
   if (!corners) throw new Error('No localicé las cuatro marcas negras debajo del QR. Encuadra la hoja completa, sin inclinarla demasiado y con buena iluminación.');
   const warped = warpPerspective(imageData.data, imageData.width, imageData.height, corners, questionCount);
-  const answers = readBubbles(warped, questionCount);
+  const answers = readBubbles(warped, questionCount, { xOffset: -8, yStart: 88 });
   const preview = document.createElement('canvas');
   preview.width = warped.width; preview.height = warped.height;
   preview.getContext('2d').putImageData(new ImageData(warped.data, warped.width, warped.height), 0, 0);

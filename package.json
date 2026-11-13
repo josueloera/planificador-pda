@@ -1,7 +1,7 @@
 {
   "name": "planificador-docente-secundaria",
   "private": true,
-  "version": "1.0.53",
+  "version": "1.0.54",
   "description": "Herramienta de Gestión Docente NEM - Secundaria",
   "author": "Josue Loera",
   "main": "electron/main.js",
@@ -18,7 +18,9 @@
     "dist:mac": "vite build && electron-builder --mac --universal",
     "test:teacher": "node --test scripts/test-teacher-advisor.mjs scripts/test-teacher-ai.cjs",
     "test:backup": "node --test scripts/test-backups.cjs",
-    "test:elara": "node --test scripts/test-elara.mjs scripts/test-google-service.cjs"
+    "test:elara": "node --test scripts/test-elara.mjs scripts/test-google-service.cjs",
+    "test:quarterly-rounding": "node --test scripts/test-quarterly-rounding.mjs",
+    "test:omr-reader": "node --test scripts/test-omr-bubble-reader.mjs"
   },
   "build": {
     "appId": "com.josue.planificador.secundaria",

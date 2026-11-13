@@ -66,6 +66,9 @@ jobs:
       - name: Verify incident records
         run: node --test scripts/test-incidencias.cjs
 
+      - name: Verify quarterly decimal rounding and ExamScan bubble reading
+        run: npm run test:quarterly-rounding && npm run test:omr-reader
+
       - name: Verify individualized QR assignments
         run: npm run test:qr
 
