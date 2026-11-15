@@ -1,5 +1,6 @@
 import { useCteCalendar, CteAgenda } from './cteCalendar.jsx';
 import SortableMenu from './components/SortableMenu';
+import TutorialDocente from './components/TutorialDocente';
 import GoogleSync from './components/GoogleSync';
 const CTE = lazy(() => import('./components/CTE'));
 const Specialists = lazy(() => import('./components/Specialists'));
@@ -113,6 +114,7 @@ const TIPOS_EVENTO = {
 
 function App() {
   const [vista, setVista] = useState('GRUPOS');
+  const [tutorialInicialAbierto, setTutorialInicialAbierto] = useState(false);
   const [grupoActual, setGrupoActual] = useState(null);
   
   // LICENCIA
@@ -710,7 +712,7 @@ function App() {
                 </div>
             )}
         </div>
-        <SortableMenu items={menuItems} edition="secundaria" />
+        <SortableMenu items={menuItems} edition="secundaria" onTutorial={() => setTutorialInicialAbierto(true)} />
     </div>
   );}
 
@@ -954,6 +956,8 @@ style={{ display: 'flex', gap: 10, alignItems: 'center' }}
         </Suspense>
       </RenderErrorBoundary>
       {vista === 'MENU' && <LegalInfo />}
+      {vista !== 'MENU' && vista !== 'LICENCIA' && vista !== 'GRUPOS' && <TutorialDocente vista={vista} />}
+      {tutorialInicialAbierto && <TutorialDocente vista="MENU" inicial open onClose={() => setTutorialInicialAbierto(false)} />}
       {updateBanner}
     </>
   );
