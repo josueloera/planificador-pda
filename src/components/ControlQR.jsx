@@ -274,6 +274,8 @@ export default function ControlQR({
   const [cargandoCriterios, setCargandoCriterios] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [exportarAsistenciaTodas, setExportarAsistenciaTodas] = useState(false);
+  const [vinculacionGuardada, setVinculacionGuardada] = useState(null);
+  const [mostrarAyudaVinculacion, setMostrarAyudaVinculacion] = useState(false);
 
   // Cargar IP local, Asistencias, Trabajos y Perfiles guardados en SQLite para la fecha actual
   const cargarDatosDia = () => {
@@ -1110,7 +1112,7 @@ export default function ControlQR({
         grupo_id: grupoActual.id, tipo: 'asistencia',
         criterio_ids: criteriosAsistenciaDestino.map(c => c.id), escala: Number(escalaDestinoAsis)
       });
-      setShowModalExportAsis(false);
+      setVinculacionGuardada({ tipo: 'Asistencia', grupo: grupoActual.nombre || `${grupoActual.grado || ''} ${grupoActual.seccion || ''}`.trim(), criterios: criteriosAsistenciaDestino.map(c => c.nombre), escala: Number(escalaDestinoAsis) });
       notificarImportacion(criteriosAsistenciaDestino[0]);
       if (showToast) showToast('✅ Asistencia vinculada. Cada día se actualizará en su fecha durante todo el ciclo.');
     } catch (err) {
@@ -1133,7 +1135,7 @@ export default function ControlQR({
       await ipcRenderer.invoke('configurar-evaluacion-automatica', {
         grupo_id: grupoActual.id, tipo: tipoVinculoTrab, criterio_ids: [destino.id], escala: 10
       });
-      setShowModalExportTrab(false);
+      setVinculacionGuardada({ tipo: 'Trabajos', grupo: grupoActual.nombre || `${grupoActual.grado || ''} ${grupoActual.seccion || ''}`.trim(), criterios: [destino.nombre], escala: 10 });
       notificarImportacion(destino);
       if (showToast) showToast('✅ Trabajos vinculados. Cada promedio diario se actualizará en su fecha.');
     } catch (err) {
@@ -1724,7 +1726,8 @@ export default function ControlQR({
                   )}
 
                   {/* SELECTOR RÁPIDO DE ACTIVIDADES (BOTONES / TARJETAS POR TAREA Y MATERIA) */}
-                  <div style={{ marginBottom: '14px' }}>
+      
+            <div style={{ marginBottom: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <label style={{ fontWeight: 'bold', fontSize: '12px', color: '#975a16', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>⚡ Actividades de Hoy (1 clic para cambiar de tarea y materia):</span>
@@ -3329,19 +3332,22 @@ export default function ControlQR({
       {/* MODAL 1: EXPORTAR ASISTENCIA A CRITERIO DE EVALUACIÓN */}
       {showModalExportAsis && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', width: '480px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', width: '480px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#1a365d' }}>🔗 Vincular Asistencia con Evaluación</h3>
             <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#718096' }}>
               Vincula la asistencia de todo el ciclo (<strong>{ciclo.inicio} al {ciclo.fin}</strong>) con los criterios elegidos. La nota se actualizará automáticamente con cada registro o corrección.
             </p>
 
+            <button type="button" onClick={() => setMostrarAyudaVinculacion(v => !v)} style={{ marginBottom: '14px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #3182ce', background: '#ebf8ff', color: '#2b6cb0', cursor: 'pointer', fontWeight: 'bold' }}>{mostrarAyudaVinculacion ? 'Ocultar ayuda' : 'Ayuda: configurar la vinculación'}</button>
+            {mostrarAyudaVinculacion && <div style={{ marginBottom: '14px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #90cdf4', background: '#ebf8ff', color: '#2a4365', fontSize: '13px', lineHeight: 1.55 }}><strong>Cómo configurar y comprobar la vinculación</strong><ol style={{ paddingLeft: '20px', margin: '8px 0' }}><li>Confirma el grupo activo y el ciclo escolar en Configuración.</li><li>En Evaluación, crea y guarda el criterio que recibirá los datos; revisa nombre, materia o campo y porcentaje.</li><li>Vuelve aquí, elige la materia o campo y selecciona exactamente ese criterio.</li><li>Para asistencia, decide si se aplicará a otros criterios de asistencia y selecciona la escala 10 o 100. Para trabajos, selecciona el criterio que recibirá el promedio diario.</li><li>Revisa el resumen de destinos y pulsa Guardar vinculación automática. Espera la confirmación verde con grupo, criterios y escala.</li><li>Registra o corrige una asistencia o un trabajo y abre Evaluación en esa misma fecha para confirmar que el dato llegó al criterio elegido.</li></ol><span>Si no aparece el criterio, confirma que esté guardado para el grupo activo y vuelve a abrir esta ventana. Los promedios se reflejan por fecha.</span></div>}
+            {vinculacionGuardada && vinculacionGuardada.tipo === 'Asistencia' && <div role="status" style={{ marginBottom: '14px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #68d391', background: '#f0fff4', color: '#22543d', fontSize: '13px' }}><strong>Vinculación guardada correctamente</strong><br />Grupo: {vinculacionGuardada.grupo || grupoActual?.nombre || 'Grupo activo'}<br />Criterio(s): {vinculacionGuardada.criterios.join(', ')}<br />Escala: {vinculacionGuardada.escala}<br /><span>Registra una asistencia nueva para comprobar el resultado en Evaluación.</span></div>}
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>
                 Disciplina / Campo Formativo de Destino:
               </label>
               <select
                 value={campoDestinoAsis}
-                onChange={e => setCampoDestinoAsis(e.target.value)}
+                onChange={e => { setVinculacionGuardada(null); setCampoDestinoAsis(e.target.value); }}
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '14px' }}
               >
                 <option value="TODOS">Todos los Criterios de la Materia</option>
@@ -3355,7 +3361,7 @@ export default function ControlQR({
               </label>
               <select
                 value={criterioDestinoAsis}
-                onChange={e => setCriterioDestinoAsis(e.target.value)}
+                onChange={e => { setVinculacionGuardada(null); setCriterioDestinoAsis(e.target.value); }}
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '14px' }}
               >
                 <option value="">-- Elige un Criterio (ej. Asistencia 10%) --</option>
@@ -3391,7 +3397,7 @@ export default function ControlQR({
               </label>
               <select
                 value={escalaDestinoAsis}
-                onChange={e => setEscalaDestinoAsis(Number(e.target.value))}
+                onChange={e => { setVinculacionGuardada(null); setEscalaDestinoAsis(Number(e.target.value)); }}
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '14px' }}
               >
                 <option value={10}>Base 10 (100% Asistencia = 10, 80% = 8.0)</option>
@@ -3451,12 +3457,15 @@ export default function ControlQR({
       )}
       {showModalExportTrab && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', width: '480px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', width: '480px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#1a365d' }}>🔗 Vincular Trabajos con Evaluación</h3>
             <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#718096' }}>
               Vincula {tipoVinculoTrab === 'examenes' ? 'los exámenes' : tipoVinculoTrab === 'tareas' ? 'las tareas' : 'los trabajos de clase'} de esta materia durante todo el ciclo (<strong>{ciclo.inicio} al {ciclo.fin}</strong>). Cada promedio diario se mostrará en su fecha y se actualizará al registrar, corregir o eliminar un trabajo.
             </p>
 
+            <button type="button" onClick={() => setMostrarAyudaVinculacion(v => !v)} style={{ marginBottom: '14px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #3182ce', background: '#ebf8ff', color: '#2b6cb0', cursor: 'pointer', fontWeight: 'bold' }}>{mostrarAyudaVinculacion ? 'Ocultar ayuda' : 'Ayuda: configurar la vinculación'}</button>
+            {mostrarAyudaVinculacion && <div style={{ marginBottom: '14px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #90cdf4', background: '#ebf8ff', color: '#2a4365', fontSize: '13px', lineHeight: 1.55 }}><strong>Cómo configurar y comprobar la vinculación</strong><ol style={{ paddingLeft: '20px', margin: '8px 0' }}><li>Confirma el grupo activo y el ciclo escolar en Configuración.</li><li>En Evaluación, crea y guarda el criterio que recibirá los datos; revisa nombre, materia o campo y porcentaje.</li><li>Vuelve aquí, elige la materia o campo y selecciona exactamente ese criterio.</li><li>Para asistencia, decide si se aplicará a otros criterios de asistencia y selecciona la escala 10 o 100. Para trabajos, selecciona el criterio que recibirá el promedio diario.</li><li>Revisa el resumen de destinos y pulsa Guardar vinculación automática. Espera la confirmación verde con grupo, criterios y escala.</li><li>Registra o corrige una asistencia o un trabajo y abre Evaluación en esa misma fecha para confirmar que el dato llegó al criterio elegido.</li></ol><span>Si no aparece el criterio, confirma que esté guardado para el grupo activo y vuelve a abrir esta ventana. Los promedios se reflejan por fecha.</span></div>}
+            {vinculacionGuardada && vinculacionGuardada.tipo === 'Trabajos' && <div role="status" style={{ marginBottom: '14px', padding: '12px 14px', borderRadius: '8px', border: '1px solid #68d391', background: '#f0fff4', color: '#22543d', fontSize: '13px' }}><strong>Vinculación guardada correctamente</strong><br />Grupo: {vinculacionGuardada.grupo || grupoActual?.nombre || 'Grupo activo'}<br />Criterio(s): {vinculacionGuardada.criterios.join(', ')}<br />Escala: {vinculacionGuardada.escala}<br /><span>Registra un trabajo nuevo para comprobar el resultado en Evaluación.</span></div>}
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>
                 Filtro de Campo Formativo:
@@ -3478,7 +3487,7 @@ export default function ControlQR({
               <select aria-label="Registros del criterio" value={tipoVinculoTrab} onChange={e => { setTipoVinculoTrab(e.target.value); setCriterioDestinoTrab(''); }}><option value="trabajos">Trabajos de clase</option><option value="tareas">Tareas</option><option value="examenes">Exámenes</option></select>
               <select
                 value={criterioDestinoTrab}
-                onChange={e => setCriterioDestinoTrab(e.target.value)}
+                onChange={e => { setVinculacionGuardada(null); setCriterioDestinoTrab(e.target.value); }}
                 style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e0', fontSize: '14px' }}
               >
                 <option value="">-- Elige un Criterio (ej. Trabajos en clase 30%) --</option>

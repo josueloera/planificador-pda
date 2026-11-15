@@ -1,3 +1,7 @@
+# Elara Secundaria 1.0.55
+
+- Agrega ayuda paso a paso para configurar la vinculación QR con criterios de asistencia y trabajos, y una confirmación visible del grupo, criterio y escala guardados.
+
 # Elara Secundaria 1.0.54
 
 - Permite elegir decimas o numeros enteros para la calificacion final del reporte trimestral.
