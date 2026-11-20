@@ -1,3 +1,7 @@
+# Elara Secundaria 1.0.58
+
+- Corrige la transferencia de lista y expedientes del grupo en escritorio para que las acciones IPC reciban el grupo seleccionado.
+
 # Elara Secundaria 1.0.57
 
 - Reune la lista y los expedientes del grupo en una sola tarjeta de gestion.

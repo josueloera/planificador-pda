@@ -8,10 +8,10 @@ const columns = async (db, table) => (await all(db, `PRAGMA table_info(${identif
 
 function registerGroupRosterTransfer({ db, ipcMain, dialog, BrowserWindow }) {
   let busy = false;
-  const guarded = fn => async event => {
+  const guarded = fn => async (event, ...args) => {
     if (busy) throw new Error('Espera a que termine la transferencia actual.');
     busy = true;
-    try { return await fn(event); } finally { busy = false; }
+    try { return await fn(event, ...args); } finally { busy = false; }
   };
   ipcMain.handle('grupo-exportar-lista', guarded(async (event, id) => {
     const groupId = Number(id);
