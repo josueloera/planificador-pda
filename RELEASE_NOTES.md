@@ -1,3 +1,8 @@
+# Elara Secundaria 1.0.57
+
+- Reune la lista y los expedientes del grupo en una sola tarjeta de gestion.
+- Permite compartir nombres, perfiles y documentos del expediente con docentes de otras materias de Secundaria.
+
 # Elara Secundaria 1.0.55
 
 - Agrega ayuda paso a paso para configurar la vinculación QR con criterios de asistencia y trabajos, y una confirmación visible del grupo, criterio y escala guardados.

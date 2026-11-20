@@ -89,6 +89,7 @@ const examScan = require('./examScan.cjs');
 examScan.installSchema(db);
 const normalizarExamField = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 require('./databaseBackup.cjs').registerBackupHandlers({ db, dbPath, sqlite3, ipcMain, dialog: require('electron').dialog, BrowserWindow, app, edition: 'secundaria', version: app.getVersion() });
+require('./groupRosterTransfer.cjs').registerGroupRosterTransfer({ db, ipcMain, dialog, BrowserWindow });
 require('./elaraDesktop.cjs').registerElara({db,dbPath,sqlite3,ipcMain,app,edition:'secundaria',version:app.getVersion()});
 
 // --- 1.B GESTIÓN DE LA BASE DE DATOS UNIVERSAL (SEP) ---
