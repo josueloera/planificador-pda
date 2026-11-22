@@ -1160,11 +1160,29 @@ export default function ControlQR({
     : '-';
 
   return (
-    <div data-document="qr" style={{ padding: '20px', fontFamily: 'system-ui, sans-serif', color: '#2d3748' }}>
+    <div data-document="qr" className={showExamManager ? 'examscan-print-mode' : undefined} style={{ padding: '20px', fontFamily: 'system-ui, sans-serif', color: '#2d3748' }}>
       {/* ESTILOS DE IMPRESIÓN PARA GAFETES */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
+          .examscan-print-mode > :not(.examscan-manager-overlay) { display: none !important; }
+          .examscan-manager-overlay {
+            position: static !important;
+            inset: auto !important;
+            z-index: auto !important;
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+          .examscan-manager-overlay > [role="dialog"] {
+            width: 100% !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
           body { background: white !important; margin: 0; padding: 0; }
           .gafetes-print-grid {
             display: grid !important;
@@ -3447,7 +3465,7 @@ export default function ControlQR({
         </div>
       )}
       {showExamManager && (
-        <div className="no-print" style={{ position: 'fixed', inset: 0, zIndex: 10001, padding: 12, background: 'rgba(20,34,52,.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="examscan-manager-overlay" style={{ position: 'fixed', inset: 0, zIndex: 10001, padding: 12, background: 'rgba(20,34,52,.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <section role="dialog" aria-modal="true" aria-label="Crear o administrar exámenes" style={{ width: 'min(1180px, 100%)', maxHeight: '96vh', overflowY: 'auto', background: '#fff', borderRadius: 14, boxShadow: '0 18px 55px rgba(0,0,0,.3)' }}>
             <React.Suspense fallback={<p role="status" style={{ padding: 24 }}>Abriendo el menú de exámenes…</p>}>
               <ExamScan edition={esSecundaria ? 'secundaria' : 'primaria'} group={grupoActual} grade={Number(grupoActual?.grado)} cycle={configCiclo} evaluationDate={fechaActualQR} ipc={ipcRenderer} onBack={() => setShowExamManager(false)} onResultSaved={({ fecha, campo }) => { if (fecha) { setFechaActualQR(fecha); onDateChanged?.(fecha); } onGradesImported?.({ fecha, campo }); }} />
