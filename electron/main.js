@@ -458,7 +458,9 @@ ipcMain.handle('examscan-create-exam', async (_event, draft) => {
   const parsedEvaluationDate = new Date(`${evaluationDate}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(evaluationDate) || !Number.isFinite(parsedEvaluationDate.getTime()) || parsedEvaluationDate.toISOString().slice(0, 10) !== evaluationDate) throw new Error('La fecha de evaluación no es válida.');
   const criterion = await new Promise((resolve, reject) => db.get('SELECT id,campo FROM criterios WHERE id=? AND grupo_id=?', [criterionId, groupId], (err, row) => err ? reject(err) : resolve(row)));
-  if (!criterion || normalizarExamField(criterion.campo) !== normalizarExamField(draft.campo_formativo)) throw new Error('El criterio del evaluador no pertenece al grupo y campo formativo seleccionados. Recarga la lista y vuelve a elegirlo.');
+  // In Secundaria, evaluation criteria belong to the group. The exam's
+  // campo_formativo is curriculum metadata and may not be stored on a criterion.
+  if (!criterion) throw new Error('El criterio del evaluador no pertenece al grupo seleccionado. Recarga la lista y vuelve a elegirlo.');
   const alumnos = await new Promise((resolve, reject) => db.all('SELECT id, nombre FROM alumnos WHERE grupo_id=? ORDER BY nombre COLLATE NOCASE', [groupId], (err, rows) => err ? reject(err) : resolve(rows || [])));
   if (!alumnos.length) throw new Error('El grupo seleccionado no tiene alumnos inscritos.');
   const group = await new Promise((resolve, reject) => db.get('SELECT grado,seccion FROM grupos_maestro WHERE id=?', [groupId], (err, row) => err ? reject(err) : resolve(row)));

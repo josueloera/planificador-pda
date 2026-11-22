@@ -1,3 +1,7 @@
+# Elara Secundaria 1.0.59
+
+- Corrige la vinculación de exámenes con criterios de evaluación del grupo aunque no tengan campo formativo asociado.
+
 # Elara Secundaria 1.0.58
 
 - Corrige la transferencia de lista y expedientes del grupo en escritorio para que las acciones IPC reciban el grupo seleccionado.
