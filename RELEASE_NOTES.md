@@ -1,3 +1,7 @@
+# Elara Secundaria 1.0.60
+
+- Corrige la impresión de ExamScan para que las hojas del examen no queden ocultas al guardar el PDF desde Captura QR.
+
 # Elara Secundaria 1.0.59
 
 - Corrige la vinculación de exámenes con criterios de evaluación del grupo aunque no tengan campo formativo asociado.
